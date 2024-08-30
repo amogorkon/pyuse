@@ -1,10 +1,9 @@
 """
 This is where the story begins. Welcome to JustUse!
-Only imports and project-global constants are defined here. 
+Only imports and project-global constants are defined here.
 All superfluous imports are deleted to clean up the namespace - and thus help()
 
 """
-
 
 import os
 import sys
@@ -135,7 +134,9 @@ class InstallationError(ImportError, JustuseIssue):
 with catch_warnings():
     from beartype.roar import BeartypeDecorHintPep585DeprecationWarning
 
-    filterwarnings("ignore", category=BeartypeDecorHintPep585DeprecationWarning, module="beartype")
+    filterwarnings(
+        "ignore", category=BeartypeDecorHintPep585DeprecationWarning, module="beartype"
+    )
 
 
 import hashlib
@@ -160,17 +161,18 @@ class Modes(IntEnum):
     no_cleanup = 2**7
 
 
-from use.aspectizing import (
-    apply_aspect,
-    iter_submodules,
-    show_aspects,
-    show_profiling,
-    tinny_profiler,
-    woody_logger,
-)
-from use.buffet import buffet_table
-from use.main import URL, ProxyModule, Use, test_version
-from use.pydantics import Version, git
+from use.aspectizing import apply as apply
+from use.aspectizing import apply_aspect
+from use.aspectizing import iter_submodules as iter_submodules
+from use.aspectizing import show_aspects as show_aspects
+from use.aspectizing import show_profiling as show_profiling
+from use.aspectizing import tinny_profiler as tinny_profiler
+from use.aspectizing import woody_logger as woody_logger
+from use.buffet import buffet_table as buffet_table
+from use.main import URL as URL
+from use.main import ProxyModule, Use, test_version
+from use.pydantics import Version as Version
+from use.pydantics import git as git
 
 for member in Modes:
     setattr(Use, member.name, member.value)
@@ -189,5 +191,7 @@ del sys
 del use.__dict__["sys"]
 
 with catch_warnings():
-    filterwarnings("ignore", category=BeartypeDecorHintPep585DeprecationWarning, module="beartype")
+    filterwarnings(
+        "ignore", category=BeartypeDecorHintPep585DeprecationWarning, module="beartype"
+    )
     apply_aspect(use.iter_submodules(use), beartype)
