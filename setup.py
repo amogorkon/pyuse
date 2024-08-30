@@ -34,7 +34,7 @@ meta = {
     "version": version,
     "author": "Anselm Kiefner",
     "author_email": "justuse-pypi@anselm.kiefner.de",
-    "python_requires": ">=3.10",
+    "python_requires": ">=3.12",
     "keywords": [
         "installing",
         "packages",
@@ -59,18 +59,19 @@ meta = {
     "maintainer_email": "justuse-pypi@anselm.kiefner.de",
     "maintainer": "Anselm Kiefner",
     "platforms": ["any"],
-    "download_url": "https://github.com/amogorkon/justuse/" "archive/refs/heads/main.zip",
+    "download_url": "https://github.com/amogorkon/justuse/"
+    "archive/refs/heads/main.zip",
 }
 
 
 requires = (
-    "beartype( >= 0.8.1)",
-    "furl(>= 2.1.2)",
-    "icontract(>= 2.5.4)",
+    "beartype( >= 0.18.5)",
+    "furl(>= 2.1.3)",
+    "icontract(>= 2.6.6)",
     "jinja2",
-    "packaging(== 21.0)",
+    "packaging(== 24.1)",
     "pip",
-    "pydantic(>= 1.8.2)",
+    "pydantic(>= 2.8.2)",
     "requests",
     "wheel",
 )
@@ -90,5 +91,5 @@ setup(
     install_requires=requires,
     setup_requires=requires,
     zip_safe=True,
-    **meta
+    **meta,
 )
