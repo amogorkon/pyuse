@@ -1,6 +1,7 @@
 """
 Delegating package installation to pip, packaging and friends.
 """
+
 import codecs
 import collections
 import contextlib
@@ -998,8 +999,9 @@ def _real_path(*, path: Path, _applied_decorators: dict, landmark) -> tuple[str,
             else:
                 frame = frame.f_back
         # a few more steps..
-        for _ in _applied_decorators[landmark]:
-            frame = frame.f_back
+        # BUG: somehow this doesn't work anymore - aspectizing is broken!
+        # for _ in _applied_decorators[landmark]:
+        #    frame = frame.f_back
         try:
             # frame is in __call__ (or rather methdispatch), we need to step two frames back
             source_dir = Path(frame.f_back.f_back.f_code.co_filename).resolve().parent
