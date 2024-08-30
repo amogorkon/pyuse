@@ -24,7 +24,7 @@ from functools import singledispatchmethod
 from logging import DEBUG, getLogger, root
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Optional, Union
+from typing import Any
 from warnings import warn
 
 import requests
@@ -261,7 +261,7 @@ class Use(ModuleType):
         config.packages.mkdir(mode=0o755, parents=True, exist_ok=True)
         self.recreate_registry()
 
-    def _set_up_registry(self, *, registry=None, path: Optional[Path] = None):
+    def _set_up_registry(self, *, registry=None, path: Path | None = None):
         # recreating reuses the registry connection and file
         if registry is None:
             if path or test_version and "DB_TEST" not in os.environ:
@@ -393,7 +393,7 @@ CREATE TABLE IF NOT EXISTS "hashes" (
         *,
         hash_algo=Hash.sha256,
         hash_value=None,
-        initial_globals: Optional[dict[Any, Any]] = None,
+        initial_globals: dict[Any, Any] | None = None,
         import_as: str = None,
         default=Modes.fastfail,
         modes=0,
@@ -636,9 +636,9 @@ VALUES (?, ?)
         *,
         package_name: str = None,
         module_name: str = None,
-        version: Optional[Union[Version, str]] = None,
+        version: Version | str | None = None,
         hash_algo=Hash.sha256,
-        hashes: Optional[Union[str, list[str]]] = None,
+        hashes: str | list[str] | None = None,
         default=Modes.fastfail,
         modes: int = 0,
         import_as: str = None,
@@ -682,9 +682,9 @@ VALUES (?, ?)
         pkg_tuple: tuple,
         /,
         *,
-        version: Optional[Union[Version, str]] = None,
+        version: Version | str | None = None,
         hash_algo=Hash.sha256,
-        hashes: Optional[Union[str, list[str]]] = None,
+        hashes: str | list[str] | None = None,
         default=Modes.fastfail,
         modes: int = 0,
         import_as: str = None,
@@ -723,15 +723,15 @@ VALUES (?, ?)
             import_as=import_as,
         )
 
-    @__call__.register(str)
+    @__call__.register
     def _use_str(
         self,
         name: str,
         /,
         *,
-        version: Optional[Union[Version, str]] = None,
+        version: Version | str | None = None,
         hash_algo=Hash.sha256,
-        hashes: Optional[Union[str, list[str]]] = None,
+        hashes: str | list[str] | None = None,
         default=Modes.fastfail,
         modes: int = 0,
         import_as: str = None,
@@ -770,15 +770,15 @@ VALUES (?, ?)
             import_as=import_as,
         )
 
-    @require(lambda hash_algo: hash_algo != None)
+    @require(lambda hash_algo: hash_algo is not None)
     def _use_package(
         self,
         *,
         name,
         package_name: str,
         module_name: str,
-        version: Optional[Version],
-        hashes: Optional[Union[str, set]],
+        version: Version | None,
+        hashes: str | set | None,
         default: Any,
         hash_algo: Hash,
         modes: int = 0,
