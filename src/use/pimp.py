@@ -32,7 +32,7 @@ from shutil import rmtree
 from sqlite3 import Cursor
 from subprocess import CalledProcessError, run
 from types import ModuleType
-from typing import Any, Optional, TypeVar, Union, get_args, get_origin
+from typing import Any, get_args, get_origin
 from warnings import catch_warnings, filterwarnings, warn
 
 import furl
@@ -50,9 +50,6 @@ from use.pydantics import PyPI_Project, PyPI_Release, RegistryEntry, Version
 from use.tools import pipes
 
 log = getLogger(__name__)
-
-
-T = TypeVar("T")
 
 
 class PlatformTag:
@@ -75,8 +72,8 @@ class PlatformTag:
 
 @beartype
 def _ensure_version(
-    result: Union[ModuleType, Exception], *, name, version, **kwargs
-) -> Union[ModuleType, Exception]:
+    result: ModuleType | Exception, *, name, version, **kwargs
+) -> ModuleType | Exception:
     if not isinstance(result, ModuleType):
         return result
     result_version = _get_version(mod=result)
@@ -87,7 +84,7 @@ def _ensure_version(
 
 # fmt: off
 @pipes
-def _ensure_path(value: Union[bytes, str, furl.Path, Path]) -> Path:
+def _ensure_path(value: bytes| str| furl.Path | Path) -> Path:
     if isinstance(value, (str, bytes)):
         return Path(value).absolute()
     if isinstance(value, furl.Path):
@@ -130,7 +127,9 @@ def get_supported() -> frozenset[PlatformTag]:  # cov: exclude
                 from pip._internal.resolution.resolvelib.factory import get_supported
     get_supported = get_supported or (lambda: [])
 
-    items: list[PlatformTag] = [PlatformTag(platform=tag.platform) for tag in get_supported()]
+    items: list[PlatformTag] = [
+        PlatformTag(platform=tag.platform) for tag in get_supported()
+    ]
 
     # yay backwards compatibility..
     if hasattr(tags, "platform_tags"):
@@ -142,7 +141,8 @@ def get_supported() -> frozenset[PlatformTag]:  # cov: exclude
 
 
 @beartype
-def _filter_by_version(releases: list[PyPI_Release], *, version: Version) -> list[PyPI_Release]:
+def _filter_by_version(
+    releases: list[PyPI_Release], *, version: Version
     return list(filter(lambda r: r.version == version, releases))
 
 
@@ -165,7 +165,10 @@ class TarFunctions:
         self.archive = tarfile.open(artifact_path)
 
     def get(self):
-        return (self.archive, [m.name for m in self.archive.getmembers() if m.type == b"0"])
+        return (
+            self.archive,
+            [m.name for m in self.archive.getmembers() if m.type == b"0"],
+        )
 
     def read_entry(self, entry_name):
         m = self.archive.getmember(entry_name)
@@ -242,11 +245,10 @@ def _clean_sys_modules(package_name: str) -> None:
 def _pebkac_no_version(
     *,
     name: str,
-    func: Callable[..., Union[Exception, ModuleType]] = None,
+    func: Callable[..., Exception | ModuleType] = None,
     Message: type,
     **kwargs,
-) -> Union[ModuleType, Exception]:
-
+) -> ModuleType | Exception:
     if func:
         result = func()
         if isinstance(result, (Exception, ModuleType)):
@@ -349,7 +351,7 @@ def _import_public_no_install(
     *,
     module_name: str,
     **kwargs,
-) -> Union[Exception, ModuleType]:
+) -> Exception | ModuleType:
     # builtin?
     builtin = False
     try:
@@ -404,7 +406,9 @@ def _parse_name(name: str) -> tuple[str, str]:
 
 
 @beartype
-def _check_db_for_installation(*, registry=Cursor, package_name=str, version) -> Optional[RegistryEntry]:
+def _check_db_for_installation(
+    *, registry=Cursor, package_name=str, version
+) -> RegistryEntry | None:
     query = registry.execute(
         """
         SELECT
@@ -428,14 +432,14 @@ def _auto_install(
     *,
     package_name: str,
     module_name: str,
-    func: Callable[..., Union[Exception, ModuleType]] = None,
+    func: Callable[..., Exception | ModuleType] | None = None,
     version: Version,
     hash_algo: Hash,
     user_provided_hashes: set[int],
     registry: Cursor,
     cleanup: bool,
     **kwargs,
-) -> Union[ModuleType, BaseException]:
+) -> ModuleType | BaseException:
     """Install, if necessary, the package and import the module in any possible way.
 
     Args:
@@ -890,8 +894,10 @@ def _is_platform_compatible(
 
 
 @beartype
-def _get_version(name: Optional[str] = None, package_name=None, /, mod=None) -> Optional[Version]:
-    version: Optional[Union[Callable[...], Version, Version, str]] = None
+def _get_version(
+    name: str | None = None, package_name=None, /, mod=None
+) -> Version | None:
+    version: Callable[...] | Version | str | None = None
     for lookup_name in (name, package_name):
         if not lookup_name:
             continue
@@ -916,7 +922,7 @@ def _build_mod(
     *,
     module_name,
     code: bytes,
-    initial_globals: Optional[dict[str, Any]],
+    initial_globals: dict[str, Any] | None,
     module_path,
     package_name="",
 ) -> ModuleType:
