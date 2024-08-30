@@ -802,29 +802,25 @@ VALUES (?, ?)
         if not hashes:
             hashes = set()
         hashes: set[int] = {
-            JACK_as_num(H) if is_JACK(H) else int(H, 16) for H in ("".join(H.split()) for H in hashes)
+            JACK_as_num(H) if is_JACK(H) else int(H, 16)
+            for H in ("".join(H.split()) for H in hashes)
         }
 
         # The "try and guess" behaviour is due to how classical imports work,
-        # which is inherently ambiguous, but can't really be avoided for packages.
-        # let's first see if the user might mean something else entirely
-        if _ensure_path(f"./{module_name}.py").exists():
-            warn(Message.ambiguous_name_warning(name), AmbiguityWarning)
 
-        installed = False
         with contextlib.suppress(importlib.metadata.PackageNotFoundError):
+            installed_version = None
             installed_version = Version(importlib.metadata.version(package_name))
-            if installed_version == version:
-                installed = True
-        spec = None
 
-        if name in self._using:
-            spec = self._using[name].spec
-        elif not auto_install:
-            spec = importlib.util.find_spec(module_name.replace("-", "_"))
-
-        case = bool(version), bool(hashes), installed, auto_install
-        log.info(f"{name}, {package_name}, {module_name}, {version}, {case}")
+        case = (
+            bool(version),
+            bool(hashes),
+            (installed_version is not None),
+            auto_install,
+        )
+        log.info(
+            f"{name=}, {package_name=}, {module_name=}, {hashes=}, {version=}, {installed_version=}, {auto_install=}, {case=}"
+        )
         # welcome to the buffet table, where everything is a lie
         kwargs = {
             "name": name,
@@ -833,7 +829,6 @@ VALUES (?, ?)
             "version": version,
             "user_provided_hashes": hashes,
             "hash_algo": hash_algo,
-            "spec": spec,
             "fastfail": fastfail,
             "no_public_installation": no_public_installation,
             "fatal_exceptions": fatal_exceptions,
@@ -842,6 +837,7 @@ VALUES (?, ?)
             "Message": Message,
             "registry": self.registry,
             "cleanup": cleanup,
+            "installed_version": installed_version,
         }
 
         result = buffet_table(case, kwargs)

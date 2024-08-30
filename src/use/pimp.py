@@ -353,18 +353,10 @@ def _import_public_no_install(
     **kwargs,
 ) -> Exception | ModuleType:
     # builtin?
-    builtin = False
-    try:
+    with contextlib.suppress(metadata.PackageNotFoundError):
         metadata.PathDistribution.from_name(module_name)
-    except metadata.PackageNotFoundError:  # indeed builtin!
-        builtin = True
 
-    mod = sys.modules.get(module_name)
-    imported = bool(mod)
-
-    if not mod:
-        mod = importlib.import_module(module_name)
-    return mod
+    return sys.modules.get(module_name) or importlib.import_module(module_name)
 
 
 def _parse_name(name: str) -> tuple[str, str]:
