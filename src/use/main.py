@@ -2,7 +2,6 @@
 Main classes that act as API for the user to interact with.
 """
 
-
 import asyncio
 import atexit
 import contextlib
@@ -31,15 +30,31 @@ import requests
 from furl import furl as URL
 from icontract import require
 
-from use import (AmbiguityWarning, Hash, Modes, NotReloadableWarning,
-                 NoValidationWarning, UnexpectedHash, VersionWarning,
-                 __version__, buffet_table, config, home, sessionID)
+from use import (
+    Hash,
+    Modes,
+    NotReloadableWarning,
+    NoValidationWarning,
+    UnexpectedHash,
+    VersionWarning,
+    __version__,
+    buffet_table,
+    config,
+    home,
+    sessionID,
+)
 from use.aspectizing import _applied_decorators, apply_aspect
-from use.hash_alphabet import JACK_as_num, is_JACK, num_as_hexdigest
+from use.hash_alphabet import JACK_as_num, is_JACK
 from use.messages import KwargMessage, StrMessage, TupleMessage, UserMessage
-from use.pimp import (_build_mod, _ensure_path, _fail_or_default,
-                      _modules_are_compatible, _parse_name, _real_path,
-                      module_from_pyc)
+from use.pimp import (
+    _build_mod,
+    _ensure_path,
+    _fail_or_default,
+    _modules_are_compatible,
+    _parse_name,
+    _real_path,
+    module_from_pyc,
+)
 from use.pydantics import Version, git
 
 
@@ -61,19 +76,24 @@ def excel_style_datetime(now: datetime) -> float:
 
 
 log = getLogger(__name__)
-log.info(f"↓↓↓ JUSTUSE SESSION {excel_style_datetime(datetime.now())} ID:{sessionID} ↓↓↓")
+log.info(
+    f"↓↓↓ JUSTUSE SESSION {excel_style_datetime(datetime.now())} ID:{sessionID} ↓↓↓"
+)
 
 # internal subpackage imports
 test_version: str = locals().get("test_version")
 
 _reloaders: dict["ProxyModule", "ModuleReloader"] = {}  # ProxyModule:Reloader
 
-# sometimes all you need is a sledge hammer..
+
+# sometimes all you need is a sledge hammer...
 def _release_locks():
     for _ in range(2):
         [lock.unlock() for lock in threading._shutdown_locks]
         [reloader.stop() for reloader in _reloaders.values()]
-    log.info(f"↑↑↑ JUSTUSE SESSION {excel_style_datetime(datetime.now())} ID:{sessionID} ↑↑↑")
+    log.info(
+        f"↑↑↑ JUSTUSE SESSION {excel_style_datetime(datetime.now())} ID:{sessionID} ↑↑↑"
+    )
 
 
 atexit.register(_release_locks)
@@ -167,7 +187,9 @@ class ModuleReloader:
     def start_threaded(self):
         self._stopped = False
         atexit.register(self.stop)
-        self._thread = threading.Thread(target=self.run_threaded, name=f"reloader__{self.name}")
+        self._thread = threading.Thread(
+            target=self.run_threaded, name=f"reloader__{self.name}"
+        )
         self._thread.start()
 
     async def run_async(self):
@@ -241,7 +263,9 @@ class Use(ModuleType):
                 response = requests.get("https://pypi.org/pypi/justuse/json")
                 "Checking if there's a new version of justuse."
                 data = response.json()
-                max_version = max(Version(version) for version in data["releases"].keys())
+                max_version = max(
+                    Version(version) for version in data["releases"].keys()
+                )
                 if Version(__version__) < max_version:
                     warn(
                         UserMessage.use_version_warning(max_version),
@@ -435,13 +459,17 @@ CREATE TABLE IF NOT EXISTS "hashes" (
             ProxyModule: the module wrapped with use.ProxyModule for convenience
         """
         if import_as:
-            assert import_as.islower(), f"import-as must be all lowercase, not {import_as}"
+            assert (
+                import_as.islower()
+            ), f"import-as must be all lowercase, not {import_as}"
             assert import_as.isidentifier(), f"expected identifier, not {import_as}"
             if import_as in sys.modules:
                 if isinstance(sys.modules[import_as], ProxyModule):
                     return sys.modules[import_as]
                 else:
-                    raise ImportError(f"already imported some other module with the identifier {import_as}")
+                    raise ImportError(
+                        f"already imported some other module with the identifier {import_as}"
+                    )
 
         log.debug(f"use-url: {url}")
         name = url.path.segments[-1]
@@ -456,7 +484,9 @@ CREATE TABLE IF NOT EXISTS "hashes" (
             module_path = None
 
         if module_path is None or not Path(module_path).exists():
-            self.registry.execute(f"DELETE FROM artifacts WHERE artifact_path='{str(url)}'")
+            self.registry.execute(
+                f"DELETE FROM artifacts WHERE artifact_path='{str(url)}'"
+            )
             self.registry.connection.commit()
             for p in config.web_modules.glob(f"*_{name}"):
                 p.unlink()
@@ -475,7 +505,9 @@ CREATE TABLE IF NOT EXISTS "hashes" (
         else:
             content = Path(module_path).read_bytes()
             # compile the module into a pyc file and save it for next time
-            py_compile.compile(module_path, module_path.parent / f"{module_path.name}c", optimize=2)
+            py_compile.compile(
+                module_path, module_path.parent / f"{module_path.name}c", optimize=2
+            )
 
         if not content:
             response = requests.get(str(url))
@@ -495,12 +527,19 @@ CREATE TABLE IF NOT EXISTS "hashes" (
                             default,
                         )
                 else:
-                    warn(UserMessage.no_validation(url, hash_algo, this_hash), NoValidationWarning)
+                    warn(
+                        UserMessage.no_validation(url, hash_algo, this_hash),
+                        NoValidationWarning,
+                    )
 
-            module_path = config.web_modules / f"{excel_style_datetime(datetime.now())}_{name}"
+            module_path = (
+                config.web_modules / f"{excel_style_datetime(datetime.now())}_{name}"
+            )
             module_path.touch(mode=0o755)
             module_path.write_bytes(content)
-            py_compile.compile(module_path, module_path.parent / f"{module_path.name}c", optimize=2)
+            py_compile.compile(
+                module_path, module_path.parent / f"{module_path.name}c", optimize=2
+            )
 
             self.registry.execute(
                 """
@@ -572,14 +611,19 @@ VALUES (?, ?)
         original_cwd = Path.cwd()
 
         if path.is_dir():
-            return _fail_or_default(ImportError(f"Can't import directory {path}"), default)
+            return _fail_or_default(
+                ImportError(f"Can't import directory {path}"), default
+            )
 
         try:
             name, module_name, package_name, path = _real_path(
-                path=path, _applied_decorators=_applied_decorators, landmark=Use.__call__.__code__
+                path=path,
+                _applied_decorators=_applied_decorators,
+                landmark=Use.__call__.__code__,
             )
         except (NotImplementedError, ImportError):
             exc = traceback.format_exc()
+        sys.path.append(path.parent)
 
         with open(path, "rb") as rfile:
             code = rfile.read()
@@ -635,6 +679,7 @@ VALUES (?, ?)
         if import_as:
             sys.modules[import_as] = mod
             if len(import_as.split(".")) > 1:
+                mod.__package__ = import_as.split()[0]
         return mod
 
     @__call__.register
