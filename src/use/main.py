@@ -314,13 +314,17 @@ CREATE TABLE IF NOT EXISTS "hashes" (
 
     def recreate_registry(self):
         number_of_backups = len(list(home.glob("registry.db*")))
-        shutil.copyfile(home / "registry.db", home / f"registry.db.{number_of_backups}.bak")
+        shutil.copyfile(
+            home / "registry.db", home / f"registry.db.{number_of_backups}.bak"
+        )
         self._clear_registry()
         self._set_up_registry(registry=self.registry)
         self.cleanup()
 
     def _clear_registry(self):
-        for table in self.registry.execute("SELECT name FROM sqlite_schema WHERE type='table';").fetchall():
+        for table in self.registry.execute(
+            "SELECT name FROM sqlite_schema WHERE type='table';"
+        ).fetchall():
             if table["name"] == "sqlite_sequence":
                 continue
             self.registry.execute(f"DROP TABLE {table['name']};")
@@ -355,7 +359,9 @@ CREATE TABLE IF NOT EXISTS "hashes" (
             "DELETE FROM artifacts WHERE distribution_id IN (SELECT id FROM distributions WHERE name=? AND version=?)",
             (name, str(version)),
         )
-        self.registry.execute("DELETE FROM distributions WHERE name=? AND version=?", (name, str(version)))
+        self.registry.execute(
+            "DELETE FROM distributions WHERE name=? AND version=?", (name, str(version))
+        )
         self.registry.connection.commit()
 
     def cleanup(self):
@@ -375,7 +381,10 @@ CREATE TABLE IF NOT EXISTS "hashes" (
         for name, version, artifact_path, installation_path in self.registry.execute(
             "SELECT name, version, artifact_path, installation_path FROM distributions JOIN artifacts on distributions.id = distribution_id"
         ).fetchall():
-            if not (_ensure_path(artifact_path).exists() and _ensure_path(installation_path).exists()):
+            if not (
+                _ensure_path(artifact_path).exists()
+                and _ensure_path(installation_path).exists()
+            ):
                 self.del_entry(name, version)
         self.registry.connection.commit()
 
