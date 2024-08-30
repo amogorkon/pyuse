@@ -36,9 +36,15 @@ import logging
 
 from use import auto_install, no_cleanup, use
 from use.aspectizing import _unwrap, _wrap, iter_submodules
-from use.hash_alphabet import JACK_as_num, hexdigest_as_JACK, is_JACK, num_as_hexdigest
-from use.pimp import _check, _get_project_from_pypi, _is_compatible, _is_version_satisfied, _parse_name
-from use.pydantics import JustUse_Info, PyPI_Release, Version
+from use.hash_alphabet import JACK_as_num, hexdigest_as_JACK, num_as_hexdigest
+from use.pimp import (
+    _check,
+    _get_project_from_pypi,
+    _is_compatible,
+    _is_version_satisfied,
+    _parse_name,
+)
+from use.pydantics import JustUse_Info, PyPI_Release
 
 log = logging.getLogger(".".join((__package__, __name__)))
 log.setLevel(logging.DEBUG if "DEBUG" in os.environ else logging.NOTSET)
@@ -47,7 +53,6 @@ use.config.testing = True
 use.config.no_browser = True
 
 # this is actually a test!
-from tests.simple_funcs import three
 
 
 @fixture()
@@ -250,7 +255,9 @@ def test_is_version_satisfied(reuse):
         "yanked": False,
         "yanked_reason": None,
     }
-    assert False == _is_version_satisfied(info.get("requires_python", ""), reuse.Version(sys_version))
+    assert False == _is_version_satisfied(
+        info.get("requires_python", ""), reuse.Version(sys_version)
+    )
 
     # pure python
     info = {
@@ -277,7 +284,10 @@ def test_is_version_satisfied(reuse):
 
 
 def test_find_windows_artifact(reuse):
-    assert reuse.Version("3.17.3") in _get_project_from_pypi(package_name="protobuf").releases
+    assert (
+        reuse.Version("3.17.3")
+        in _get_project_from_pypi(package_name="protobuf").releases
+    )
 
 
 def test_classic_import_same_version(reuse):
@@ -343,7 +353,9 @@ def test_suggestion_works(reuse):
             assert False, f"Actually returned mod: {mod}"
         except RuntimeWarning:
             recommended_hash = buf.getvalue().splitlines()[-1].strip()
-        mod = reuse(name, version=version, hashes={recommended_hash}, modes=reuse.auto_install)
+        mod = reuse(
+            name, version=version, hashes={recommended_hash}, modes=reuse.auto_install
+        )
         assert mod
 
 
@@ -368,7 +380,8 @@ def installed_or_skip(reuse, name, version=None):
         skip(f"{name} partially installed: {spec=}, {pnfe}")
 
     if not (
-        (ver := dist.metadata["version"]) and (not version or reuse.Version(ver) == reuse.Version(version))
+        (ver := dist.metadata["version"])
+        and (not version or reuse.Version(ver) == reuse.Version(version))
     ):
         skip(f"found '{name}' v{ver}, but require v{version}")
         return False
@@ -472,7 +485,10 @@ def test_use_version_upgrade_warning(reuse):
             shell=False,
             stderr=STDOUT,
         )
-        match = re.search(r"(?P<category>[a-zA-Z_]+): " r"(?:(?!\d).)* (?P<version>\d+\.\d+\.\d+)", output)
+        match = re.search(
+            r"(?P<category>[a-zA-Z_]+): " r"(?:(?!\d).)* (?P<version>\d+\.\d+\.\d+)",
+            output,
+        )
         assert match
         assert match["category"] == use.VersionWarning.__name__
         assert match["version"] == str(version)
@@ -532,7 +548,9 @@ def test_pypi_model():
 
 def test_setup_py_works(reuse):
     with ScopedCwd(Path(__file__).parent.parent):
-        result = subprocess.check_output([sys.executable, "setup.py", "--help"], shell=False)
+        result = subprocess.check_output(
+            [sys.executable, "setup.py", "--help"], shell=False
+        )
         assert result
 
 
@@ -580,7 +598,12 @@ def test_441_discord(reuse):
 
 @mark.parametrize(
     "name,expected",
-    [("", (None, None)), ("foo", ("foo", "foo")), ("foo/bar", ("foo", "bar")), ("foo.py", ("foo", "foo.py"))],
+    [
+        ("", (None, None)),
+        ("foo", ("foo", "foo")),
+        ("foo/bar", ("foo", "bar")),
+        ("foo.py", ("foo", "foo.py")),
+    ],
 )
 def test_parse_name(name, expected):
     assert _parse_name(name) == expected
@@ -590,7 +613,9 @@ def test_51_sqlalchemy_failure_default_to_none(reuse):
     mod = use(
         "sqlalchemy",
         version="0.7.1",
-        hashes={"45df54adf"},  # the real thing takes 12 sec to run, way too long for a test
+        hashes={
+            "45df54adf"
+        },  # the real thing takes 12 sec to run, way too long for a test
         # SQLAlchemy-0.7.1.tar.gz (2.3 MB) - only a single artifact
         # Uploaded Jun 5, 2011 source
         # but it's bugged on import - it's looking for time.clock(), which isn't a thing (anymore)
@@ -639,19 +664,30 @@ def test_specific_packages(reuse, package_name, module_name, version, hashes):
     """
     if sys.version_info < (3, 11):
         mod = reuse(
-            (package_name, module_name), version=version, hashes=hashes, modes=auto_install | no_cleanup
+            (package_name, module_name),
+            version=version,
+            hashes=hashes,
+            modes=auto_install | no_cleanup,
         )
         assert isinstance(mod, ModuleType)
 
 
 def test_451_ignore_spaces_in_hashes(reuse):
     # single hash
-    mod = use("package-example", version="0.1", hashes="Y復㝿浯䨩䩯鷛㬉鼵爔滥哫鷕逮 愁墕萮緩", modes=auto_install | no_cleanup)
+    mod = use(
+        "package-example",
+        version="0.1",
+        hashes="Y復㝿浯䨩䩯鷛㬉鼵爔滥哫鷕逮 愁墕萮緩",
+        modes=auto_install | no_cleanup,
+    )
     assert mod
     del mod
     # hash list
     mod = use(
-        "package-example", version="0.1", hashes={"Y復㝿浯䨩䩯鷛㬉鼵爔滥哫鷕逮 愁墕萮緩"}, modes=auto_install | no_cleanup
+        "package-example",
+        version="0.1",
+        hashes={"Y復㝿浯䨩䩯鷛㬉鼵爔滥哫鷕逮 愁墕萮緩"},
+        modes=auto_install | no_cleanup,
     )
     assert mod
     del mod
@@ -686,7 +722,10 @@ def test_454_bad_metadata(reuse):
         except RuntimeWarning:
             recommended_hash = buf.getvalue().splitlines()[-1].strip()
         mod = reuse(
-            name, version=version, hashes={recommended_hash}, modes=reuse.auto_install | reuse.no_cleanup
+            name,
+            version=version,
+            hashes={recommended_hash},
+            modes=reuse.auto_install | reuse.no_cleanup,
         )
         assert mod
 
@@ -701,7 +740,10 @@ def test_454_no_tags(reuse):
         except RuntimeWarning:
             recommended_hash = buf.getvalue().splitlines()[-1].strip()
         mod = reuse(
-            name, version=version, hashes={recommended_hash}, modes=reuse.auto_install | reuse.no_cleanup
+            name,
+            version=version,
+            hashes={recommended_hash},
+            modes=reuse.auto_install | reuse.no_cleanup,
         )
         assert mod
 

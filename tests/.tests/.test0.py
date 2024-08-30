@@ -1,10 +1,13 @@
-import sys
+import use
 
-import numpy as np
+use(use.Path(".test1.py"))
 
-#for name, mod in list(sys.modules.items()):
-#    del sys.modules[name]
-#    sys.modules[f"'numpy'.name.removeprefix('numpy.')"] = mod
+# mod1 = use("numpy")
+# print(mod1)
+# print(mod1.__version__)
 
-for x in sys.modules:
-    print(x)
+#mod2 = use("numpy", version="1.19.2", modes=use.auto_install)
+
+#print(mod2)
+#print(mod2.__version__)
+print("end")
