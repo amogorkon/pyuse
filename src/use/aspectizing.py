@@ -4,8 +4,7 @@ import inspect
 import re
 import sys
 from collections import namedtuple
-from collections.abc import Awaitable, Callable, Iterable, Sized
-from enum import Enum
+from collections.abc import Callable, Iterable, Sized
 from functools import wraps
 from logging import getLogger
 from pathlib import Path
@@ -14,17 +13,20 @@ from types import ModuleType
 from typing import Any, DefaultDict, Deque, Optional, Union
 
 from beartype import beartype
-from icontract import require
 
 log = getLogger(__name__)
 
 from use import config
-from use.messages import _web_aspectized, _web_aspectized_dry_run, _web_tinny_profiler
+from use.messages import _web_aspectized_dry_run, _web_tinny_profiler
 
 # TODO: use an extra WeakKeyDict as watchdog for object deletions and trigger cleanup in these here
-_applied_decorators: DefaultDict[tuple[object, str], Deque[Callable]] = DefaultDict(Deque)
+_applied_decorators: DefaultDict[tuple[object, str], Deque[Callable]] = DefaultDict(
+    Deque
+)
 "to see which decorators are applied, in which order"
-_aspectized_functions: DefaultDict[tuple[object, str], Deque[Callable]] = DefaultDict(Deque)
+_aspectized_functions: DefaultDict[tuple[object, str], Deque[Callable]] = DefaultDict(
+    Deque
+)
 "the actually decorated functions to undo aspectizing"
 
 
@@ -106,7 +108,11 @@ def apply_aspect(
             return
 
         for name in dir(thing):
-            qualname = "" if len(qualname_lst) < 3 else "..." + ".".join(qualname_lst[-3:]) + "." + name
+            qualname = (
+                ""
+                if len(qualname_lst) < 3
+                else "..." + ".".join(qualname_lst[-3:]) + "." + name
+            )
             obj = getattr(thing, name, None)
             qualname = getattr(obj, "__qualname__", qualname)
 
@@ -115,7 +121,9 @@ def apply_aspect(
             # Time to get serious!
 
             if type(obj) == type:
-                aspectize(obj, decorator, qualname_lst=qualname_lst, module_name=module_name)
+                aspectize(
+                    obj, decorator, qualname_lst=qualname_lst, module_name=module_name
+                )
 
             if id(obj) in visited:
                 continue
@@ -172,12 +180,22 @@ def apply_aspect(
 
     if dry_run:
         if config.no_browser:
-            print("Tried to do a dry run and display the results, but no_browser is set in config.")
+            print(
+                "Tried to do a dry run and display the results, but no_browser is set in config."
+            )
         else:
-            print("Please check your browser to select options and filters for aspects.")
-            log.warning("Please check your browser to select options and filters for aspects.")
+            print(
+                "Please check your browser to select options and filters for aspects."
+            )
+            log.warning(
+                "Please check your browser to select options and filters for aspects."
+            )
             _web_aspectized_dry_run(
-                decorator=decorator, pattern=pattern, check=check, hits=hits, module_name=str(thing)
+                decorator=decorator,
+                pattern=pattern,
+                check=check,
+                hits=hits,
+                module_name=str(thing),
             )
 
 
@@ -189,6 +207,14 @@ def _wrap(*, thing: Any, obj: Any, decorator: Callable, name: str) -> Any:
 
     # This will fail with TypeError on built-in/extension types.
     # We handle exceptions outside, let's not betray ourselves.
+    setattr(thing, name, wrapped)
+    return wrapped
+
+
+def apply(*, thing, decorator, name):
+    """Public version of aspectizing a single thing."""
+    obj = getattr(thing, name)
+    wrapped = decorator(obj)
     setattr(thing, name, wrapped)
     return wrapped
 
@@ -213,7 +239,9 @@ def _unwrap(*, thing: Any, name: str):
 def _qualname(thing):
     if type(thing) is bool:
         return str(thing)
-    module = getattr(thing, "__module__", None) or getattr(thing.__class__, "__module__", None)
+    module = getattr(thing, "__module__", None) or getattr(
+        thing.__class__, "__module__", None
+    )
     qualname = (
         getattr(thing, "__qualname__", None)
         or getattr(thing, "__name__", None)
@@ -222,8 +250,10 @@ def _qualname(thing):
     qualname = destringified(qualname)
     return qualname if module == "builtins" else f"{module}::{qualname}"
 
+
 def destringified(thing):
     return str(thing).replace("'", "")
+
 
 def describe(thing):
     if thing is None:
@@ -267,7 +297,7 @@ def woody_logger(thing: Callable) -> Callable:
                 res = thing(*args, **kwargs)
                 after = perf_counter_ns()
                 print(
-                    f"-> {name}() (in {after - before} ns ({round((after - before) / 10**9, 5)} sec) -> {type(res)}",
+                    f"-> {name}() (in {after - before} ns ({round((after - before) / 10** 9, 5)} sec) -> {type(res)}",
                     sep="\n",
                 )
                 return res
@@ -290,19 +320,21 @@ def woody_logger(thing: Callable) -> Callable:
             after = perf_counter_ns()
             if isinstance(res, (Sized)):
                 print(
-                    f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10**9, 5)} sec) -> {describe(res)}",
+                    f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10** 9, 5)} sec) -> {describe(res)}",
                     sep="\n",
                 )
                 return res
-            if isinstance(res, (Iterable)):  # TODO: Iterable? Iterator? Generator? Ahhhh!
+            if isinstance(
+                res, (Iterable)
+            ):  # TODO: Iterable? Iterator? Generator? Ahhhh!
                 print(
-                    f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10**9, 5)} sec) -> {describe(res)}",
+                    f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10** 9, 5)} sec) -> {describe(res)}",
                     sep="\n",
                 )
                 return res
 
             print(
-                f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10**9, 5)} sec) -> {describe(res)}",
+                f"-> {describe(thing)} (in {after - before} ns ({round((after - before) / 10** 9, 5)} sec) -> {describe(res)}",
                 sep="\n",
             )
             return res
@@ -343,7 +375,9 @@ def _is_builtin(name, mod):
         return True
 
     if hasattr(mod, "__file__"):
-        relpath = Path(mod.__file__).parent.relative_to((Path(sys.executable).parent / "lib"))
+        relpath = Path(mod.__file__).parent.relative_to(
+            (Path(sys.executable).parent / "lib")
+        )
         if relpath == Path():
             return True
         if relpath.parts[0] == "site-packages":
