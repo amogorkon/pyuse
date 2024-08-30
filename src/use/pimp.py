@@ -78,7 +78,10 @@ def _ensure_version(
         return result
     result_version = _get_version(mod=result)
     if result_version != version:
-        warn(UserMessage.version_warning(name, version, result_version), category=VersionWarning)
+        warn(
+            UserMessage.version_warning(name, version, result_version),
+            category=VersionWarning,
+        )
     return result
 
 
@@ -143,6 +146,7 @@ def get_supported() -> frozenset[PlatformTag]:  # cov: exclude
 @beartype
 def _filter_by_version(
     releases: list[PyPI_Release], *, version: Version
+) -> list[PyPI_Release]:
     return list(filter(lambda r: r.version == version, releases))
 
 
@@ -189,12 +193,14 @@ def archive_meta(artifact_path):
         functions = ZipFunctions(artifact_path)
 
     archive, names = functions.get()
-    meta = names << filter(DIST_PKG_INFO_REGEX.search) << map(functions.read_entry) >> dict
+    meta = (
+        names << filter(DIST_PKG_INFO_REGEX.search) << map(functions.read_entry) >> dict
+    )
     meta.update(
         dict(
-            (lp := l.partition(": "), (lp[0].lower().replace("-", "_"), lp[2]))[-1]
-            for l in meta.get("METADATA", meta.get("PKG-INFO"))
-            if ": " in l
+            (lp := line.partition(": "), (lp[0].lower().replace("-", "_"), lp[2]))[-1]
+            for line in meta.get("METADATA", meta.get("PKG-INFO"))
+            if ": " in line
         )
     )
     name = meta.get("name", Path(artifact_path).stem.split("-")[0])
@@ -226,17 +232,15 @@ def archive_meta(artifact_path):
 
 @beartype
 def _clean_sys_modules(package_name: str) -> None:
-    for k in dict(
-        [
-            (k, v)
-            for k, v in list(sys.modules.items())
-            if package_name in k.split(".")
-            and (
-                getattr(v, "__spec__", None) is None
-                or isinstance(v, (SourceFileLoader, zipimport.zipimporter))
-            )
-        ]
-    ):
+    for k in dict([
+        (k, v)
+        for k, v in list(sys.modules.items())
+        if package_name in k.split(".")
+        and (
+            getattr(v, "__spec__", None) is None
+            or isinstance(v, (SourceFileLoader, zipimport.zipimporter))
+        )
+    ]):
         if k in sys.modules:
             del sys.modules[k]
 
@@ -275,7 +279,9 @@ def _pebkac_no_hash(
     ordered = _sort_releases(filtered)
 
     if not no_browser:
-        _web_pebkac_no_hash(name=name, package_name=package_name, version=version, releases=ordered)
+        _web_pebkac_no_hash(
+            name=name, package_name=package_name, version=version, releases=ordered
+        )
 
     if not ordered:
         return RuntimeWarning(Message.no_recommendation(package_name, version))
@@ -324,10 +330,15 @@ def _pebkac_no_version_no_hash(
 
         if not no_browser:
             version = ordered[-1].version
-            _web_pebkac_no_hash(name=name, package_name=package_name, version=version, project=proj)
+            _web_pebkac_no_hash(
+                name=name, package_name=package_name, version=version, project=proj
+            )
             return RuntimeWarning(
                 Message.pebkac_no_version_no_hash(
-                    name=name, package_name=package_name, version=version, no_browser=no_browser
+                    name=name,
+                    package_name=package_name,
+                    version=version,
+                    no_browser=no_browser,
                 )
             )
 
@@ -447,7 +458,9 @@ def _auto_install(
         else:
             raise AssertionError(f"{func!r} returned {result!r}")
 
-    if entry := _check_db_for_installation(registry=registry, package_name=package_name, version=version):
+    if entry := _check_db_for_installation(
+        registry=registry, package_name=package_name, version=version
+    ):
         # is there a point in checking the hashes at this point? probably not.
         if entry.pure_python_package:
             assert entry.artifact_path.exists()
@@ -492,7 +505,9 @@ def _auto_install(
         # got an url for an artifact with a hash given by the user, let's install it
         filename = url.asdict()["path"]["segments"][-1]
         artifact_path = config.packages / filename
-        _download_artifact(artifact_path=artifact_path, url=url, hash_value=H, hash_algo=hash_algo)
+        _download_artifact(
+            artifact_path=artifact_path, url=url, hash_value=H, hash_algo=hash_algo
+        )
         try:
             log.info("Attempting to install..")
             entry = _install(
@@ -521,7 +536,9 @@ def _auto_install(
             package_name=package_name,
             version=version,
             artifact_path=entry.artifact_path,
-            hash_value=int(hash_algo.value(entry.artifact_path.read_bytes()).hexdigest(), 16),
+            hash_value=int(
+                hash_algo.value(entry.artifact_path.read_bytes()).hexdigest(), 16
+            ),
             hash_algo=hash_algo,
             installation_path=entry.installation_path,
             registry=registry,
@@ -570,11 +587,14 @@ VALUES ({registry.lastrowid}, '{hash_algo.name}', '{hash_value}')"""
 
 @beartype
 @ensure(lambda url: str(url).startswith("http"))
-def _download_artifact(*, artifact_path: Path, url: URL, hash_algo: Hash, hash_value: int):
+def _download_artifact(
+    *, artifact_path: Path, url: URL, hash_algo: Hash, hash_value: int
+):
     # let's check if we downloaded it already, just in case
     if (
         artifact_path.exists()
-        and int(hash_algo.value(artifact_path.read_bytes()).hexdigest(), 16) == hash_value
+        and int(hash_algo.value(artifact_path.read_bytes()).hexdigest(), 16)
+        == hash_value
     ):
         log.info("Artifact already downloaded. Hashes matching.")
         return
@@ -589,7 +609,9 @@ def _download_artifact(*, artifact_path: Path, url: URL, hash_algo: Hash, hash_v
         artifact_path.write_bytes(data)
     if int(hash_algo.value(artifact_path.read_bytes()).hexdigest(), 16) != hash_value:
         # this means either PyPI is hacked or there is a man-in-the-middle
-        raise ImportError("Hashes don't match. Aborting. Something very fishy is going on.")
+        raise ImportError(
+            "Hashes don't match. Aborting. Something very fishy is going on."
+        )
     log.info("Download successful.")
     return
 
@@ -597,7 +619,11 @@ def _download_artifact(*, artifact_path: Path, url: URL, hash_algo: Hash, hash_v
 @beartype
 def _is_pure_python_package(artifact_path: Path, meta: dict) -> bool:
     return next(
-        (False for n, s in product(meta["names"], importlib.machinery.EXTENSION_SUFFIXES) if n.endswith(s)),
+        (
+            False
+            for n, s in product(meta["names"], importlib.machinery.EXTENSION_SUFFIXES)
+            if n.endswith(s)
+        ),
         ".tar" not in str(artifact_path),
     )
 
@@ -609,7 +635,10 @@ def _find_module_in_venv(package_name: str, version: Version, relp: str) -> Path
     site_dirs = [
         env_dir / f"Lib{suffix}" / "site-packages"
         if sys.platform == "win32"
-        else env_dir / f"lib{suffix}" / ("python%d.%d" % sys.version_info[:2]) / "site-packages"
+        else env_dir
+        / f"lib{suffix}"
+        / ("python%d.%d" % sys.version_info[:2])
+        / "site-packages"
         for suffix in ("64", "")
     ]
     log.debug("site_dirs=%s", site_dirs)
@@ -725,10 +754,12 @@ def _install(
         except CalledProcessError as err:
             log.error("::".join(err.cmd, err.output, err.stdout, err.stderr))
             raise InstallationError(err) from err
-        output = run(**setup)
+        run(**setup)
         log.info("Installation successful.")
 
-    installation_path = _find_module_in_venv(package_name=package_name, version=version, relp=relp)
+    installation_path = _find_module_in_venv(
+        package_name=package_name, version=version, relp=relp
+    )
 
     return RegistryEntry(
         installation_path=installation_path,
@@ -774,7 +805,9 @@ def _get_project_from_pypi(*, package_name: str) -> PyPI_Project | Exception:
 
 
 @beartype
-def _get_releases_from_pypi(*, package_name: str, version: Version) -> list[PyPI_Release] | Exception:
+def _get_releases_from_pypi(
+    *, package_name: str, version: Version
+) -> list[PyPI_Release] | Exception:
     # let's check if package name is correct
     url = f"https://pypi.org/pypi/{package_name}"
     response = requests.get(url)
@@ -793,7 +826,9 @@ def _get_releases_from_pypi(*, package_name: str, version: Version) -> list[PyPI
 
 
 @beartype
-def _filter_by_platform(releases: list[PyPI_Release], *, tags: frozenset[PlatformTag]) -> list[PyPI_Release]:
+def _filter_by_platform(
+    releases: list[PyPI_Release], *, tags: frozenset[PlatformTag]
+) -> list[PyPI_Release]:
     def compatible(info: PyPI_Release, include_sdist=False) -> bool:
         return (
             _is_platform_compatible(info, tags, include_sdist)
@@ -801,8 +836,12 @@ def _filter_by_platform(releases: list[PyPI_Release], *, tags: frozenset[Platfor
             and (include_sdist or info.justuse.ext not in ("tar", "tar.gz" "zip"))
         )
 
-    filtered = [release for release in releases if compatible(release, include_sdist=False)]
-    return filtered or [release for release in releases if compatible(release, include_sdist=True)]
+    filtered = [
+        release for release in releases if compatible(release, include_sdist=False)
+    ]
+    return filtered or [
+        release for release in releases if compatible(release, include_sdist=True)
+    ]
 
 
 @beartype
@@ -844,8 +883,9 @@ def _is_version_satisfied(specifier: str, sys_version) -> bool:
 def _is_platform_compatible(
     info: PyPI_Release, platform_tags: frozenset[PlatformTag], include_sdist=False
 ) -> bool:
-
-    if not include_sdist and (".tar" in info.justuse.ext or info.justuse.python_tag in ("cpsource", "sdist")):
+    if not include_sdist and (
+        ".tar" in info.justuse.ext or info.justuse.python_tag in ("cpsource", "sdist")
+    ):
         return False
 
     if "win" in (info.packagetype or "unknown") and sys.platform != "win32":
@@ -867,7 +907,9 @@ def _is_platform_compatible(
     }
 
     if info.platform_tag:
-        given_platform_tags = info.platform_tag.split(".") << map(PlatformTag) >> frozenset
+        given_platform_tags = (
+            info.platform_tag.split(".") << map(PlatformTag) >> frozenset
+        )
     else:
         return include_sdist
 
@@ -881,7 +923,8 @@ def _is_platform_compatible(
         given_python_tag = set(info.python_tag.split("."))
 
     return any(supported_tags.intersection(given_python_tag)) and (
-        (info.is_sdist and include_sdist) or any(given_platform_tags.intersection(platform_tags))
+        (info.is_sdist and include_sdist)
+        or any(given_platform_tags.intersection(platform_tags))
     )
 
 
@@ -954,25 +997,9 @@ def _fail_or_default(exception: BaseException, default: Any):
         raise exception
 
 
-# ### active web dev ###
-# proj = None
-# from shutil import copy
-
-
-# def _qwer():
-#     copy(Path(__file__).absolute().parent / r"templates/stylesheet.css", config.home / "stylesheet.css")
-#     package_name = "pygame"
-#     name = "pygame/foo"
-#     version = Version("2.1.0")
-#     global proj
-#     if proj is None:
-#         proj = _get_data_from_pypi(package_name=package_name, version=version)
-#         proj = _filter_by_version(proj, version)
-
-#     _web_pebkac_no_hash(package_name=package_name, version=version, name=name, project=proj)
-
-
-def _real_path(*, path: Path, _applied_decorators: dict, landmark) -> tuple[str, str, str, Path]:
+def _real_path(
+    *, path: Path, _applied_decorators: dict, landmark
+) -> tuple[str, str, str, Path]:
     source_dir = Path.cwd()
     # calling from another use()d module
     # let's see where we started
@@ -991,6 +1018,7 @@ def _real_path(*, path: Path, _applied_decorators: dict, landmark) -> tuple[str,
         # If it was, we need to skip those decorators before finally get to the user code and
         # we can actually see from where we've been called.
         frame = inspect.currentframe()
+
         while True:
             if frame.f_code == landmark:
                 break
@@ -1018,7 +1046,9 @@ def _real_path(*, path: Path, _applied_decorators: dict, landmark) -> tuple[str,
         else:
             source_dir = Path.cwd()
     if not source_dir.exists():
-        raise NotImplementedError("Can't determine a relative path from a virtual file.")
+        raise NotImplementedError(
+            "Can't determine a relative path from a virtual file."
+        )
     if not path.exists():
         path = source_dir.joinpath(path).resolve()
     if not path.exists():
@@ -1127,7 +1157,9 @@ def _check(x, y):
         return False
 
     # now to the more specific cases (something => something else)
-    with contextlib.suppress(TypeError):  # issubclass is allergic to container classes (types.GenericAlias)
+    with contextlib.suppress(
+        TypeError
+    ):  # issubclass is allergic to container classes (types.GenericAlias)
         # let's first check if we're dealing with numbers
         if issubclass(x, Number) and issubclass(y, Number):
             # since the generic implementations aren't actual subclasses of each other
@@ -1168,7 +1200,10 @@ def _check(x, y):
     if X is not None and Y is not None:
         # (Sequence => list) is OK, (list => Sequence) is NOK
         return (
-            all(_check(x_, y_) for x_, y_ in zip_longest(get_args(x), get_args(y), fillvalue=Any))
+            all(
+                _check(x_, y_)
+                for x_, y_ in zip_longest(get_args(x), get_args(y), fillvalue=Any)
+            )
             if issubclass(Y, X)
             else False
         )
