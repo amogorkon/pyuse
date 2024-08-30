@@ -1,8 +1,7 @@
+# noqa: E701
 # here we're building the buffet of the future with pattern matching (>=3.10)
 
 from logging import getLogger
-
-log = getLogger(__name__)
 
 from use.messages import UserMessage as Message
 from use.pimp import (
@@ -14,6 +13,8 @@ from use.pimp import (
     _pebkac_no_version_no_hash,
 )
 from use.tools import pipes
+
+log = getLogger(__name__)
 
 
 # fmt: off
