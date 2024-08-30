@@ -18,7 +18,6 @@ import sys
 import threading
 import time
 import traceback
-from collections import namedtuple
 from collections.abc import Callable
 from datetime import datetime
 from functools import singledispatchmethod
@@ -68,7 +67,6 @@ log.info(f"↓↓↓ JUSTUSE SESSION {excel_style_datetime(datetime.now())} ID:{
 test_version: str = locals().get("test_version")
 
 _reloaders: dict["ProxyModule", "ModuleReloader"] = {}  # ProxyModule:Reloader
-_using = {}
 
 # sometimes all you need is a sledge hammer..
 def _release_locks():
@@ -79,8 +77,6 @@ def _release_locks():
 
 
 atexit.register(_release_locks)
-
-ModInUse = namedtuple("ModInUse", "name mod path spec")
 
 
 class ProxyModule(ModuleType):
@@ -233,7 +229,6 @@ class Use(ModuleType):
     """
 
     def __init__(self):
-        self._using = _using
         # might run into issues during testing otherwise
         self.registry = self._set_up_registry()
         "Registry sqlite DB to store all relevant package metadata."
@@ -630,7 +625,7 @@ VALUES (?, ?)
 
         if import_as:
             sys.modules[import_as] = mod
-        self._set_mod(name=name, mod=mod)
+            if len(import_as.split(".")) > 1:
         return mod
 
     @__call__.register
@@ -857,7 +852,6 @@ VALUES (?, ?)
             return _fail_or_default(result, default)
 
         if isinstance(result, ModuleType):
-            self._set_mod(name=name, mod=result, spec=spec)
             if import_as:
                 M = sys.modules[module_name]
                 sys.modules[import_as] = M
