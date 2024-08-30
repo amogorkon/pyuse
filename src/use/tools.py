@@ -4,14 +4,8 @@ Module to hold the decorators and other utility functions used in justuse.
 
 import ast
 import inspect
-
-from collections.abc import Callable
-from functools import singledispatch
-from functools import update_wrapper
 from itertools import takewhile
 from textwrap import dedent
-
-from use import NirvanaWarning
 
 
 class _PipeTransformer(ast.NodeTransformer):
@@ -30,8 +24,11 @@ class _PipeTransformer(ast.NodeTransformer):
                     col_offset=node.right.col_offset,
                 )
             )
-        node.right.args.insert(0 if isinstance(node.op, ast.RShift) else len(node.right.args), node.left)
+        node.right.args.insert(
+            0 if isinstance(node.op, ast.RShift) else len(node.right.args), node.left
+        )
         return self.visit(node.right)
+
 
 def pipes(func_or_class):
     if inspect.isclass(func_or_class):
@@ -51,26 +48,14 @@ def pipes(func_or_class):
     tree.body[0].decorator_list = [
         d
         for d in tree.body[0].decorator_list
-        if isinstance(d, ast.Call) and d.func.id != "pipes" or isinstance(d, ast.Name) and d.id != "pipes"
+        if isinstance(d, ast.Call)
+        and d.func.id != "pipes"
+        or isinstance(d, ast.Name)
+        and d.id != "pipes"
     ]
     tree = _PipeTransformer().visit(tree)
-    code = compile(tree, filename=(ctx["__file__"] if "__file__" in ctx else "repl"), mode="exec")
+    code = compile(
+        tree, filename=(ctx["__file__"] if "__file__" in ctx else "repl"), mode="exec"
+    )
     exec(code, ctx)
     return ctx[tree.body[0].name]
-
-# singledispatch for methods
-def methdispatch(func):
-    dispatcher = singledispatch(func)
-
-    def wrapper(*args, **kwargs):
-
-        # so we can dispatch on None
-        if len(args) == 1:
-            if not kwargs:
-                raise NirvanaWarning("No use trying to use Nothing.")
-            args = args + (None,)
-        return dispatcher.dispatch(args[1].__class__)(*args, **kwargs)
-
-    wrapper.register = dispatcher.register
-    update_wrapper(wrapper, func)
-    return wrapper

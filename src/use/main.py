@@ -21,7 +21,8 @@ import traceback
 from collections import namedtuple
 from collections.abc import Callable
 from datetime import datetime
-from logging import DEBUG, INFO, NOTSET, getLogger, root
+from functools import singledispatchmethod
+from logging import DEBUG, getLogger, root
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Optional, Union
@@ -41,7 +42,6 @@ from use.pimp import (_build_mod, _ensure_path, _fail_or_default,
                       _modules_are_compatible, _parse_name, _real_path,
                       module_from_pyc)
 from use.pydantics import Version, git
-from use.tools import methdispatch
 
 
 def excel_style_datetime(now: datetime) -> float:
@@ -384,17 +384,13 @@ CREATE TABLE IF NOT EXISTS "hashes" (
                 self.del_entry(name, version)
         self.registry.connection.commit()
 
-    def _set_mod(self, *, name, mod, path=None, spec=None):
-        """Helper to get the order right."""
-        self._using[name] = ModInUse(name, mod, path, spec)
-
-    @methdispatch
+    @singledispatchmethod
     def __call__(self, thing, /, *args, **kwargs):
         raise NotImplementedError(UserMessage.cant_use(thing))
 
     @require(lambda hash_algo: hash_algo in Hash)
     @require(lambda as_import: as_import.isidentifier())
-    @__call__.register(URL)
+    @__call__.register
     def _use_url(
         self,
         url: URL,
@@ -527,7 +523,7 @@ VALUES (?, ?)
             sys.modules[import_as] = mod
         return mod
 
-    @__call__.register(git)
+    @__call__.register
     def _use_git(
         self,
         git_repo: git,
@@ -537,10 +533,10 @@ VALUES (?, ?)
     ) -> ProxyModule:
         """Install git repo."""
 
-    @__call__.register(Path)
+    @__call__.register
     def _use_path(
         self,
-        path,
+        path: Path,
         /,
         *,
         initial_globals=None,
@@ -637,10 +633,10 @@ VALUES (?, ?)
         self._set_mod(name=name, mod=mod)
         return mod
 
-    @__call__.register(type(None))  # singledispatch is picky - can't be anything but a type
+    @__call__.register
     def _use_kwargs(
         self,
-        _: None,  # sic! otherwise single-dispatch with 'empty' *args won't work
+        thing: None,  # sic! otherwise single-dispatch with 'empty' *args won't work
         /,
         *,
         package_name: str = None,
@@ -685,10 +681,10 @@ VALUES (?, ?)
             import_as=import_as,
         )
 
-    @__call__.register(tuple)
+    @__call__.register
     def _use_tuple(
         self,
-        pkg_tuple,
+        pkg_tuple: tuple,
         /,
         *,
         version: Optional[Union[Version, str]] = None,
