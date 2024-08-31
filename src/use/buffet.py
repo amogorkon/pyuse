@@ -23,7 +23,7 @@ def buffet_table(case, kwargs):
     match case:
 #            +-------------------------- version specified?
 #            |  +----------------------- hash specified?
-#            |  |  +-------------------- already publicly available?
+#            |  |  +-------------------- publicly available?
 #            |  |  |  +----------------- auto-install requested?
 #            |  |  |  |
 #            v  v  v  v
