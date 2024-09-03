@@ -1,25 +1,17 @@
 """
-Pydantic model for the PyPI JSON API.
+Pydantic models for JustUse for validation of PyPI API responses and other data.
 """
+
 import os
 import re
-
-from logging import INFO
-from logging import getLogger
+from logging import INFO, getLogger
 from pathlib import Path
-from typing import Optional
-from typing import Union
 
 import packaging
-
 from packaging.version import Version as PkgVersion
 from pydantic import BaseModel
 
 log = getLogger(__name__)
-
-
-# Well, apparently they refuse to make Version iterable, so we'll have to do it ourselves.
-# This is necessary to compare sys.version_info with Version and make some tests more elegant, amongst other things.
 
 
 class Configuration(BaseModel):
@@ -30,15 +22,28 @@ class Configuration(BaseModel):
     debugging: bool = bool(int(os.getenv("DEBUG", "0")))
     use_db: bool = bool(int(os.getenv("USE_DB", "1")))
     testing: bool = bool(int(os.getenv("TESTING", "0")))
-    home: Path = Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute()
-    venv: Path = Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute() / "venv"
-    packages: Path = (
-        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute() / "packages"
+    home: Path = Path(
+        os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))
+    ).absolute()
+    venv: Path = (
+        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute()
+        / "venv"
     )
-    web_modules: Path = Path(os.getenv("JUSTUSE-HOME", str(Path.home() / ".justuse-python"))) / "web-modules"
-    logs: Path = Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute() / "logs"
+    packages: Path = (
+        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute()
+        / "packages"
+    )
+    web_modules: Path = (
+        Path(os.getenv("JUSTUSE-HOME", str(Path.home() / ".justuse-python")))
+        / "web-modules"
+    )
+    logs: Path = (
+        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute()
+        / "logs"
+    )
     registry: Path = (
-        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute() / "registry.db"
+        Path(os.getenv("JUSTUSE_HOME", str(Path.home() / ".justuse-python"))).absolute()
+        / "registry.db"
     )
 
     class Config:
@@ -49,17 +54,27 @@ class git(BaseModel):
     repo: str
     host: str = "github.com"
     branch: str = "main"
-    commit: Optional[str] = None
+    commit: str | None = None
 
 
 class Version(PkgVersion):
+    """Well, apparently they refuse to make Version iterable, so we'll have to do it ourselves.
+    This is necessary to compare sys.version_info with Version and make some tests more elegant, amongst other things."""
+
     def __new__(cls, *args, **kwargs):
         if args and isinstance(args[0], Version):
             return args[0]
         else:
             return super(cls, Version).__new__(cls)
 
-    def __init__(self, versionobj: Optional[Union[PkgVersion, str]] = None, *, major=0, minor=0, patch=0):
+    def __init__(
+        self,
+        versionobj: PkgVersion | str | None = None,
+        *,
+        major=0,
+        minor=0,
+        patch=0,
+    ):
         if isinstance(versionobj, Version):
             return
 
@@ -91,7 +106,7 @@ class Version(PkgVersion):
         yield cls.validate
 
     @classmethod
-    def validate(cls, value):
+    def validate(cls, value, info):
         return Version(value)
 
 
@@ -112,27 +127,27 @@ class RegistryEntry(BaseModel):
 
 
 class JustUse_Info(BaseModel):
-    distribution: Optional[str]
-    version: Optional[str]
-    build_tag: Optional[str]
-    python_tag: Optional[str]
-    abi_tag: Optional[str]
-    platform_tag: Optional[str]
-    ext: Optional[str]
+    distribution: str | None = None
+    version: str | None = None
+    build_tag: str | None = None
+    python_tag: str | None = None
+    abi_tag: str | None = None
+    platform_tag: str | None = None
+    ext: str | None = None
 
 
 class PyPI_Release(BaseModel):
-    abi_tag: Optional[str]
-    build_tag: Optional[str]
-    distribution: Optional[str]
+    abi_tag: str | None = None
+    build_tag: str | None = None
+    distribution: str | None = None
     digests: dict[str, str]
-    ext: Optional[str]
+    ext: str | None = None
     filename: str
-    requires_python: Optional[str]
+    requires_python: str | None = None
     packagetype: str
-    platform_tag: Optional[str]
-    python_version: Optional[str]
-    python_tag: Optional[str]
+    platform_tag: str | None = None
+    python_version: str | None = None
+    python_tag: str | None = None
     url: str
     version: Version
     yanked: bool
@@ -143,10 +158,12 @@ class PyPI_Release(BaseModel):
     @property
     def is_sdist(self):
         return (
-            self.packagetype == "sdist" or self.python_version == "source" or self.justuse.abi_tag == "none"
+            self.packagetype == "sdist"
+            or self.python_version == "source"
+            or self.justuse.abi_tag == "none"
         )
 
-# TODO: cleanup, this is too weird
+    # TODO: cleanup, this is too weird
     @property
     def justuse(self) -> JustUse_Info:
         pp = Path(self.filename)
@@ -156,14 +173,20 @@ class PyPI_Release(BaseModel):
             ext = pp.name[len(pp.stem) + 1 :]
         rest = pp.name[: -len(ext) - 1]
 
-        not_dash = lambda name: f"(?P<{name}>[^-]+)"
-        not_dash_with_int = lambda name: f"(?P<{name}>[0-9][^-]*)"
         if match := re.match(
-            f"{not_dash('distribution')}-{not_dash('version')}-?{not_dash_with_int('build_tag')}?-?{not_dash('python_tag')}?-?{not_dash('abi_tag')}?-?{not_dash('platform_tag')}?",
+            f"{_not_dash('distribution')}-{_not_dash('version')}-?{_not_dash_with_int('build_tag')}?-?{_not_dash('python_tag')}?-?{_not_dash('abi_tag')}?-?{_not_dash('platform_tag')}?",
             rest,
         ):
             return JustUse_Info(**_delete_none(match.groupdict()), ext=ext)
         return JustUse_Info()
+
+
+def _not_dash(name: str) -> str:
+    return f"(?P<{name}>[^-]+)"
+
+
+def _not_dash_with_int(name: str) -> str:
+    return f"(?P<{name}>[0-9][^-]*)"
 
 
 class PyPI_Downloads(BaseModel):
@@ -176,40 +199,40 @@ class PyPI_Info(BaseModel):
     class Config:
         extra = "ignore"
 
-    description_content_type: Optional[str]
-    download_url: Optional[str]
-    package_name: Optional[str]
+    description_content_type: str | None
+    download_url: str | None
+    pkg_name: str | None
     package_url: str
-    platform: Optional[str]
-    project_url: Optional[str]
-    project_urls: Optional[dict[str, str]]
-    release_url: Optional[str]
-    requires_dist: Optional[list[str]]
-    requires_python: Optional[str]
-    summary: Optional[str]
-    version: Optional[str]
-    yanked: Optional[bool]
-    yanked_reason: Optional[str]
+    platform: str | None
+    project_url: str | None
+    project_urls: dict[str, str] | None
+    release_url: str | None
+    requires_dist: list[str] | None
+    requires_python: str | None
+    summary: str | None
+    version: str | None
+    yanked: bool | None
+    yanked_reason: str | None
 
 
 class PyPI_URL(BaseModel):
-    abi_tag: Optional[str]
-    build_tag: Optional[str]
+    abi_tag: str | None
+    build_tag: str | None
     digests: dict[str, str]
     url: str
     packagetype: str
-    requires_python: Optional[str]
-    python_version: Optional[str]
+    requires_python: str | None
+    python_version: str | None
     filename: str
     yanked: bool
-    distribution: Optional[str]
-    python_tag: Optional[str]
-    platform_tag: Optional[str]
-    ext: Optional[str]
+    distribution: str | None
+    python_tag: str | None
+    platform_tag: str | None
+    ext: str | None
 
 
 class PyPI_Project(BaseModel):
-    releases: Optional[dict[Version, list[PyPI_Release]]] = {}
+    releases: dict[Version, list[PyPI_Release]] | None = {}
     urls: list[PyPI_URL] = None
     last_serial: int = None
     info: PyPI_Info = None
@@ -241,7 +264,9 @@ class PyPI_Project(BaseModel):
 
             super(PyPI_Project, self).__init__(
                 releases={
-                    str(ver_str): [get_info(rel_info, ver_str) for rel_info in release_infos]
+                    str(ver_str): [
+                        get_info(rel_info, ver_str) for rel_info in release_infos
+                    ]
                     for ver_str, release_infos in releases.items()
                 },
                 urls=[
