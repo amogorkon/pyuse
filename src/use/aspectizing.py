@@ -46,7 +46,7 @@ def is_callable(thing):
         return False
 
 
-HIT = namedtuple("Hit", "qualname name type success exception dunder module_name")
+HIT = namedtuple("Hit", "qualname name type success exception dunder mod_name")
 
 
 def really_callable(thing):
@@ -89,7 +89,7 @@ def apply_aspect(
         /,
         *,
         qualname_lst: Optional[list] = None,
-        module_name: str,
+        mod_name: str,
     ) -> Iterable[HIT]:
         name = getattr(thing, "__name__", str(thing))
         if not qualname_lst:
@@ -101,10 +101,10 @@ def apply_aspect(
 
         # let's stick within the module boundary
         try:
-            thing_module_name = inspect.getmodule(thing).__name__
+            thing_mod_name = inspect.getmodule(thing).__name__
         except AttributeError:
-            thing_module_name = "<unknown>"
-        if thing_module_name != module_name:
+            thing_mod_name = "<unknown>"
+        if thing_mod_name != mod_name:
             return
 
         for name in dir(thing):
@@ -121,9 +121,7 @@ def apply_aspect(
             # Time to get serious!
 
             if type(obj) == type:
-                aspectize(
-                    obj, decorator, qualname_lst=qualname_lst, module_name=module_name
-                )
+                aspectize(obj, decorator, qualname_lst=qualname_lst, mod_name=mod_name)
 
             if id(obj) in visited:
                 continue
@@ -150,7 +148,7 @@ def apply_aspect(
                 if file:
                     print(msg, file=file)
             assert isinstance(name, str) and len(name) > 0
-            assert isinstance(module_name, str) and module_name != ""
+            assert isinstance(mod_name, str) and mod_name != ""
 
             hits.append(
                 HIT(
@@ -160,17 +158,17 @@ def apply_aspect(
                     success,
                     msg,
                     name.startswith("__") and name.endswith("__"),
-                    module_name,
+                    mod_name,
                 )
             )
             visited.add(id(wrapped))
 
     def call(m):
         try:
-            module_name = inspect.getmodule(m).__name__
+            mod_name = inspect.getmodule(m).__name__
         except AttributeError:
-            module_name = "<unknown>"
-        aspectize(m, decorator, module_name=module_name)
+            mod_name = "<unknown>"
+        aspectize(m, decorator, mod_name=mod_name)
 
     if isinstance(thing, Iterable):
         for x in thing:
@@ -195,7 +193,7 @@ def apply_aspect(
                 pattern=pattern,
                 check=check,
                 hits=hits,
-                module_name=str(thing),
+                mod_name=str(thing),
             )
 
 
