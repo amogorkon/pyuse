@@ -1119,6 +1119,17 @@ def _is_compatible(pre, post):
     return all(_check(x, y) for x, y in zip_longest(pre_sig, post_sig, fillvalue=Any))
 
 
+def _is_builtin(name: str) -> bool:
+    if name in sys.builtin_module_names:
+        return True
+    spec = importlib.util.find_spec(name)
+    return (
+        spec is not None
+        and spec.origin is not None
+        and "site-packages" not in spec.origin
+    )
+
+
 # TODO Rename this here and in `_is_compatible`
 def _extracted_from__is_compatible_(args, arg1, kwargs, sig):
     for k, result in args:
