@@ -839,6 +839,7 @@ VALUES (?, ?)
         Message: type = UserMessage,
         import_as: str = None,
     ):
+        # preparing the yummy kwargs for the buffet...
         auto_install = bool(Modes.auto_install & modes)
         no_public_installation = bool(Modes.no_public_installation & modes)
         fastfail = bool(Modes.fastfail & modes)
@@ -850,27 +851,12 @@ VALUES (?, ?)
         if mod_name:
             mod_name = mod_name.replace("/", ".").replace("-", "_")
 
-        # a single hash is a string
-        if isinstance(hashes, str):
-            # spaces are hard to see in JACK, so we ignore them
-            hashes = ["".join(hashes.split())]
-        if not hashes:
-            hashes = set()
-        hashes: set[int] = {
-            JACK_as_num(H) if is_JACK(H) else int(H, 16)
-            for H in ("".join(H.split()) for H in hashes)
-        }
-
-        # The "try and guess" behaviour is due to how classical imports work,
-
-        with contextlib.suppress(importlib.metadata.PackageNotFoundError):
-            installed_version = None
-            installed_version = Version(importlib.metadata.version(package_name))
-
+        # let's see what we'll get from the buffet table
         case = (
-            bool(version),
+            bool(req_ver),
             bool(hashes),
-            (installed_version is not None),
+            (installed_version := _installed_version(pkg_name)) is not None
+            or _is_builtin(pkg_name),
             auto_install,
         )
         log.info(
@@ -924,3 +910,24 @@ def excel_style_datetime(now: datetime) -> float:
     return int(f"{now.year:04d}{now.month:02d}{now.day:02d}") + round(
         (now.hour * 3600 + now.minute * 60 + now.second) / 86400, 6
     )
+
+
+def _hashes(hashes: str | list[str] | None) -> set[int]:
+    # a single hash is a string
+    if isinstance(hashes, str):
+        # spaces are hard to see in JACK, so we ignore them
+        res = ["".join(hashes.split())]
+    if not hashes:
+        res = set()
+    else:
+        res: set[int] = {
+            JACK_as_num(H) if is_JACK(H) else int(H, 16)
+            for H in ("".join(H.split()) for H in hashes)
+        }
+    return res
+
+
+def _installed_version(pkg_name: str) -> Version | None:
+    with contextlib.suppress(importlib.metadata.PackageNotFoundError):
+        return Version(importlib.metadata.version(pkg_name))
+    return None
