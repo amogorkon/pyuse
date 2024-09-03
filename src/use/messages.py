@@ -21,7 +21,8 @@ from use.hash_alphabet import hexdigest_as_JACK
 from use.pydantics import PyPI_Release, Version
 
 env = Environment(
-    loader=FileSystemLoader(Path(__file__).parent / "templates"), autoescape=select_autoescape()
+    loader=FileSystemLoader(Path(__file__).parent / "templates"),
+    autoescape=select_autoescape(),
 )
 
 
@@ -30,12 +31,17 @@ def std(times):
 
 
 def _web_tinny_profiler(timings):
-    copy(Path(__file__).absolute().parent / r"templates/profiling.css", home / "profiling.css")
+    copy(
+        Path(__file__).absolute().parent / r"templates/profiling.css",
+        home / "profiling.css",
+    )
     DAT = namedtuple("DECORATOR", "qualname name min geom_mean median stdev len total")
     timings_ = [
         DAT(
             getattr(
-                func, "__qualname__", getattr(func, "__module__", "") + getattr(func, "__name__", str(func))
+                func,
+                "__qualname__",
+                getattr(func, "__module__", "") + getattr(func, "__name__", str(func)),
             ),
             func.__name__,
             min(times),
@@ -56,7 +62,10 @@ def _web_tinny_profiler(timings):
 
 
 def _web_aspectized(decorators, functions):
-    copy(Path(__file__).absolute().parent / r"templates/aspects.css", home / "aspects.css")
+    copy(
+        Path(__file__).absolute().parent / r"templates/aspects.css",
+        home / "aspects.css",
+    )
     DAT = namedtuple("DECORATOR", "name func")
     redecorated = []
     for ID, funcs in decorators.items():
@@ -74,24 +83,27 @@ def _web_aspectized(decorators, functions):
 
 @beartype
 def _web_aspectized_dry_run(
-    *, decorator: Callable, hits: list, check: Callable, pattern: str, module_name: str
+    *, decorator: Callable, hits: list, check: Callable, pattern: str, mod_name: str
 ):
-    copy(Path(__file__).absolute().parent / r"templates/aspects.css", home / "aspects.css")
+    copy(
+        Path(__file__).absolute().parent / r"templates/aspects.css",
+        home / "aspects.css",
+    )
     with open(home / "aspects_dry_run.html", "w", encoding="utf-8") as file:
         args = {
             "decorator": decorator,
             "hits": hits,
             "check": check,
-            "module_name": module_name,
+            "mod_name": mod_name,
         }
         file.write(env.get_template("aspects_dry_run.html").render(**args))
     webbrowser.open(f"file://{home}/aspects_dry_run.html")
 
 
-def _web_pebkac_no_version_no_hash(*, name, package_name, version, no_browser: bool):
+def _web_pebkac_no_version_no_hash(*, name, pkg_name, version, no_browser: bool):
     if not no_browser:
-        webbrowser.open(f"https://snyk.io/advisor/python/{package_name}")
-    return f"""Please specify version and hash for auto-installation of {package_name!r}.
+        webbrowser.open(f"https://snyk.io/advisor/python/{pkg_name}")
+    return f"""Please specify version and hash for auto-installation of {pkg_name!r}.
 {"" if no_browser else "A webbrowser should open to the Snyk Advisor to check whether the package is vulnerable or malicious."}
 If you want to auto-install the latest version, try the following line to select all viable hashes:
 use("{name}", version="{version!s}", modes=use.auto_install)"""
@@ -101,11 +113,14 @@ use("{name}", version="{version!s}", modes=use.auto_install)"""
 def _web_pebkac_no_hash(
     *,
     name: str,
-    package_name: str,
+    pkg_name: str,
     version: Version,
     releases: list[PyPI_Release],
 ):
-    copy(Path(__file__).absolute().parent / r"templates/stylesheet.css", home / "stylesheet.css")
+    copy(
+        Path(__file__).absolute().parent / r"templates/stylesheet.css",
+        home / "stylesheet.css",
+    )
     entry = namedtuple("Entry", "python platform hash_name hash_value jack_value")
     table = defaultdict(lambda: [])
     for rel in (rel for rel in releases if rel.version == version):
@@ -125,7 +140,7 @@ def _web_pebkac_no_hash(
     with open(home / "web_exception.html", "w", encoding="utf-8") as file:
         args = {
             "name": name,
-            "package_name": package_name,
+            "pkg_name": pkg_name,
             "version": version,
             "table": table,
         }
@@ -155,54 +170,69 @@ python -m pip install -U justuse
         lambda thing: f"Only pathlib.Path, yarl.URL and str are valid sources of things to import, but got {type(thing)}."
     )
     web_error = (
-        lambda url, response: f"Could not load {url} from the interwebs, got a {response.status_code} error."
+        lambda url,
+        response: f"Could not load {url} from the interwebs, got a {response.status_code} error."
     )
     no_validation = (
-        lambda url, hash_algo, this_hash: f"""Attempting to import from the interwebs with no validation whatsoever!
+        lambda url,
+        hash_algo,
+        this_hash: f"""Attempting to import from the interwebs with no validation whatsoever!
 To safely reproduce:
 use(use.URL('{url}'), hash_algo=use.{hash_algo}, hash_value='{this_hash}')"""
     )
     version_warning = (
-        lambda package_name, target_version, this_version: f"{package_name} expected to be version {target_version}, but got {this_version} instead"
+        lambda pkg_name,
+        target_version,
+        this_version: f"{pkg_name} expected to be version {target_version}, but got {this_version} instead"
     )
     ambiguous_name_warning = (
-        lambda package_name: f"Attempting to load the pkg '{package_name}', if you rather want to use the local module: use(use._ensure_path('{package_name}.py'))"
+        lambda pkg_name: f"Attempting to load the pkg '{pkg_name}', if you rather want to use the local module: use(use._ensure_path('{pkg_name}.py'))"
     )
     pebkac_missing_hash = (
-        lambda *, name, package_name, version, recommended_hash, no_browser: f"""Failed to auto-install {package_name!r} because hashes aren't specified.
+        lambda *,
+        name,
+        pkg_name,
+        version,
+        recommended_hash,
+        no_browser: f"""Failed to auto-install {pkg_name!r} because hashes aren't specified.
         {"" if no_browser else "A webbrowser should open with a list of available hashes for different platforms for you to pick."}"
         If you want to use the package only on this platform, this should work:
     use("{name}", version="{version!s}", hashes={recommended_hash!r}, modes=use.auto_install)"""
     )
     pebkac_unsupported = (
-        lambda package_name: f"We could not find any version or release for {package_name} that could satisfy our requirements!"
+        lambda pkg_name: f"We could not find any version or release for {pkg_name} that could satisfy our requirements!"
     )
     pip_json_mess = (
-        lambda package_name, target_version: f"Tried to auto-install {package_name} {target_version} but failed because there was a problem with the JSON from PyPI."
+        lambda pkg_name,
+        target_version: f"Tried to auto-install {pkg_name} {target_version} but failed because there was a problem with the JSON from PyPI."
     )
     pebkac_no_version_no_hash = _web_pebkac_no_version_no_hash
     cant_import = (
-        lambda package_name: f"No pkg installed named {package_name} and auto-installation not requested. Aborting."
+        lambda pkg_name: f"No pkg installed named {pkg_name} and auto-installation not requested. Aborting."
     )
     cant_import_no_version = (
-        lambda package_name: f"Failed to auto-install '{package_name}' because no version was specified."
+        lambda pkg_name: f"Failed to auto-install '{pkg_name}' because no version was specified."
     )
 
     no_distribution_found = (
-        lambda package_name, version, last_version: f"Failed to find any distribution for {package_name} version {version} that can be run on this platform. (For your information, the most recent version of {package_name} is {last_version})"
+        lambda pkg_name,
+        version,
+        last_version: f"Failed to find any distribution for {pkg_name} version {version} that can be run on this platform. (For your information, the most recent version of {pkg_name} is {last_version})"
     )
 
     no_recommendation = (
-        lambda package_name, version: f"We could not find any release for {package_name} {version} that appears to be compatible with this platform. Check your browser for a list of hashes and select manually."
+        lambda pkg_name,
+        version: f"We could not find any release for {pkg_name} {version} that appears to be compatible with this platform. Check your browser for a list of hashes and select manually."
     )
     bad_version_given = (
-        lambda package_name, version: f"{package_name} apparently has no version {version}, please check your spelling."
+        lambda pkg_name,
+        version: f"{pkg_name} apparently has no version {version}, please check your spelling."
     )
 
 
 class StrMessage(UserMessage):
     cant_import = (
-        lambda package_name: f"No pkg installed named {package_name} and auto-installation not requested. Aborting."
+        lambda pkg_name: f"No pkg installed named {pkg_name} and auto-installation not requested. Aborting."
     )
 
 
@@ -222,7 +252,7 @@ def _web_aspectizing_overview(*, decorator, check, pattern, visited, hits):
 </head>
 <body>
 <ul>
-    {''.join(f"<li>{h}</li>" for h in hits)}
+    {"".join(f"<li>{h}</li>" for h in hits)}
 </ul>
 </body>
 </html>
