@@ -18,11 +18,11 @@
 <body onload="brython()">
     <header>
         <div id="decorator" style="display:none">{{decorator.__name__}}</div>
-        <div id="module_name" style="display:none">{{module_name}}</div>
-        <h1>Dry Run for applying {{decorator.__name__}} to &lt;{{module_name}}&gt;
+        <div id="mod_name" style="display:none">{{mod_name}}</div>
+        <h1>Dry Run for applying {{decorator.__name__}} to &lt;{{mod_name}}&gt;
         </h1>
     </header>
-    <p> Here are all the objects we could decorate inside module/package &lt;{{module_name}}&gt;.</p>
+    <p> Here are all the objects we could decorate inside module/package &lt;{{mod_name}}&gt;.</p>
     <p>
         <button class="button" , id="clipboard_button">Copy to Clipboard</button>
     </p>
@@ -87,7 +87,7 @@ document["clipboard_button"].bind("click", lambda event: window.navigator.clipbo
 args = {"pattern": document["pattern"].value, "aspectize_dunders": False}
 
 {% raw %}
-result_str = f"""use.apply_aspect({document["module_name"].text}, {document["decorator"].text}, 
+result_str = f"""use.apply_aspect({document["mod_name"].text}, {document["decorator"].text},
 **{pformat(args)})"""
 {% endraw %}
 document["result"].text = result_str
@@ -96,22 +96,22 @@ document["result"].text = result_str
 @bind(document["hide_failures"], "click")
 def show_failures_button_clicked(event):
     if document["hide_failures"].checked:
-        for x in document.select(".failure"): 
+        for x in document.select(".failure"):
             x.style.display = "none"
         document["applicable_header"].style.display = "none"
         document["reason_header"].style.display = "none"
-        for x in document.select(".applicable"): 
+        for x in document.select(".applicable"):
             x.style.display = "none"
-        for x in document.select(".reason"): 
+        for x in document.select(".reason"):
             x.style.display = "none"
-        
+
     else:
-        for x in document.select(".failure"): 
+        for x in document.select(".failure"):
             x.style.display = "table-row"
 
         document["applicable_header"].style.display = "table-cell"
         document["reason_header"].style.display = "table-cell"
-        for x in document.select(".applicable"): 
+        for x in document.select(".applicable"):
             x.style.display = "table-cell"
         for x in document.select(".reason"):
             x.style.display = "table-cell"
@@ -125,7 +125,7 @@ def show_warning(content):
 def apply_filter(event):
     document["apply_filter_warning"].addEventListener("transitionend", do_filter);
     show_warning(f"""Working.. (applying filter to {len(document.querySelectorAll('[id^="row_"]'))} objects)""")
-    
+
 def do_filter(*args):
     aspectize_dunders = document["aspectize_dunders"].checked
     pattern = re.compile(document["pattern"].value, re.DOTALL)
@@ -136,7 +136,7 @@ def do_filter(*args):
         classes = set(x.className.split(" "))
 
         if pattern.match(name):
-            selected = True 
+            selected = True
 
         if not aspectize_dunders:
             if name.startswith("__") and name.endswith("__"):
@@ -152,7 +152,7 @@ def do_filter(*args):
     args = {"pattern": document["pattern"].value, "aspectize_dunders": aspectize_dunders}
 
     {% raw %}
-    result_str = f"""use.apply_aspect({document["module_name"].text}, {document["decorator"].text}, 
+    result_str = f"""use.apply_aspect({document["mod_name"].text}, {document["decorator"].text},
     **{pformat(args)})"""
     {% endraw %}
     document["result"].text = result_str

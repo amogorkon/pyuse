@@ -72,14 +72,14 @@ class PlatformTag:
 
 @beartype
 def _ensure_version(
-    result: ModuleType | Exception, *, name, version, **kwargs
+    result: ModuleType | Exception, *, name, requested_version, **kwargs
 ) -> ModuleType | Exception:
     if not isinstance(result, ModuleType):
         return result
     result_version = _get_version(mod=result)
-    if result_version != version:
+    if result_version != requested_version:
         warn(
-            UserMessage.version_warning(name, version, result_version),
+            UserMessage.version_warning(name, requested_version, result_version),
             category=VersionWarning,
         )
     return result
@@ -231,11 +231,11 @@ def archive_meta(artifact_path):
 
 
 @beartype
-def _clean_sys_modules(package_name: str) -> None:
+def _clean_sys_modules(pkg_name: str) -> None:
     for k in dict([
         (k, v)
         for k, v in list(sys.modules.items())
-        if package_name in k.split(".")
+        if pkg_name in k.split(".")
         and (
             getattr(v, "__spec__", None) is None
             or isinstance(v, (SourceFileLoader, zipimport.zipimporter))
@@ -267,24 +267,27 @@ def _pebkac_no_version(
 def _pebkac_no_hash(
     *,
     name: str,
-    version: Version,
-    package_name: str,
+    req_ver: Version,
+    pkg_name: str,
     no_browser: bool,
     Message: type,
     hash_algo: Hash,
     **kwargs,
 ) -> RuntimeWarning:
-    releases = _get_releases_from_pypi(package_name=package_name, version=version)
+    releases = _get_releases_from_pypi(pkg_name=pkg_name, req_ver=req_ver)
     filtered = _filter_by_platform(releases, tags=get_supported())
     ordered = _sort_releases(filtered)
 
     if not no_browser:
         _web_pebkac_no_hash(
-            name=name, package_name=package_name, version=version, releases=ordered
+            name=name,
+            pkg_name=pkg_name,
+            version=req_ver,
+            releases=ordered,
         )
 
     if not ordered:
-        return RuntimeWarning(Message.no_recommendation(package_name, version))
+        return RuntimeWarning(Message.no_recommendation(pkg_name, req_ver))
 
     recommended_hash = hexdigest_as_JACK(ordered[0].digests.get(hash_algo.name))
 
@@ -294,8 +297,8 @@ def _pebkac_no_hash(
     return RuntimeWarning(
         Message.pebkac_missing_hash(
             name=name,
-            package_name=package_name,
-            version=version,
+            pkg_name=pkg_name,
+            version=req_ver,
             recommended_hash=recommended_hash,
             no_browser=no_browser,
         )
@@ -307,13 +310,13 @@ def _pebkac_no_hash(
 def _pebkac_no_version_no_hash(
     *,
     name: str,
-    package_name: str,
+    pkg_name: str,
     no_browser: bool,
     Message: type,
     **kwargs,
 ) -> Exception:
     # let's try to make an educated guess and give a useful suggestion
-    proj = _get_project_from_pypi(package_name=package_name)
+    proj = _get_project_from_pypi(pkg_name=pkg_name)
     if isinstance(proj, Exception):
         return proj
     releases = _get_releases(proj)
@@ -326,17 +329,17 @@ def _pebkac_no_version_no_hash(
         ordered = _sort_releases(releases)
         if not ordered:
             # we tried our best..
-            return RuntimeWarning(Message.pebkac_unsupported(package_name))
+            return RuntimeWarning(Message.pebkac_unsupported(pkg_name))
 
         if not no_browser:
             version = ordered[-1].version
             _web_pebkac_no_hash(
-                name=name, package_name=package_name, version=version, project=proj
+                name=name, pkg_name=pkg_name, version=version, project=proj
             )
             return RuntimeWarning(
                 Message.pebkac_no_version_no_hash(
                     name=name,
-                    package_name=package_name,
+                    pkg_name=pkg_name,
                     version=version,
                     no_browser=no_browser,
                 )
@@ -350,7 +353,7 @@ def _pebkac_no_version_no_hash(
     return RuntimeWarning(
         Message.pebkac_no_version_no_hash(
             name=name,
-            package_name=package_name,
+            pkg_name=pkg_name,
             version=recommended_version,
             no_browser=no_browser,
         )
@@ -360,14 +363,10 @@ def _pebkac_no_version_no_hash(
 @beartype
 def _import_public_no_install(
     *,
-    module_name: str,
+    mod_name: str,
     **kwargs,
 ) -> Exception | ModuleType:
-    # builtin?
-    with contextlib.suppress(metadata.PackageNotFoundError):
-        metadata.PathDistribution.from_name(module_name)
-
-    return sys.modules.get(module_name) or importlib.import_module(module_name)
+    return sys.modules.get(mod_name) or importlib.import_module(mod_name)
 
 
 def _parse_name(name: str) -> tuple[str, str]:
@@ -383,34 +382,34 @@ def _parse_name(name: str) -> tuple[str, str]:
 
     def old():
         # as fallback
-        match = re.match(r"(?P<package_name>[^/.]+)/?(?P<rest>[a-zA-Z0-9._]+)?$", name)
+        match = re.match(r"(?P<pkg_name>[^/.]+)/?(?P<rest>[a-zA-Z0-9._]+)?$", name)
         assert match, f"Invalid name spec: {name!r}"
         names = match.groupdict()
-        package_name = names["package_name"]
+        pkg_name = names["pkg_name"]
         rest = names["rest"]
-        if not package_name:
-            package_name = rest
+        if not pkg_name:
+            pkg_name = rest
         if not rest:
-            rest = package_name
-        return package_name
+            rest = pkg_name
+        return pkg_name
 
-    package_name = None
-    module_name = ""
+    pkg_name = None
+    mod_name = ""
     if "/" in name:
         if name.count("/") > 1:
             raise ImportError(
                 f"Invalid name spec: {name!r}, can't have multiple / characters as package/module separator."
             )
-        package_name, _, module_name = name.partition("/")
+        pkg_name, _, mod_name = name.partition("/")
     else:
-        package_name = old()
-        module_name = name
-    return (package_name, module_name)
+        pkg_name = old()
+        mod_name = name
+    return (pkg_name, mod_name)
 
 
 @beartype
 def _check_db_for_installation(
-    *, registry=Cursor, package_name=str, version
+    *, registry=Cursor, pkg_name=str, version
 ) -> RegistryEntry | None:
     query = registry.execute(
         """
@@ -422,7 +421,7 @@ def _check_db_for_installation(
         ORDER BY artifacts.id DESC
         """,
         (
-            package_name,
+            pkg_name,
             str(version),
         ),
     ).fetchone()
@@ -433,10 +432,10 @@ def _check_db_for_installation(
 def _auto_install(
     mod: ModuleType | Exception | None = None,
     *,
-    package_name: str,
-    module_name: str,
+    pkg_name: str,
+    mod_name: str,
     func: Callable[..., Exception | ModuleType] | None = None,
-    version: Version,
+    req_ver: Version,
     hash_algo: Hash,
     user_provided_hashes: set[int],
     registry: Cursor,
@@ -459,13 +458,13 @@ def _auto_install(
             raise AssertionError(f"{func!r} returned {result!r}")
 
     if entry := _check_db_for_installation(
-        registry=registry, package_name=package_name, version=version
+        registry=registry, pkg_name=pkg_name, version=req_ver
     ):
         # is there a point in checking the hashes at this point? probably not.
         if entry.pure_python_package:
             assert entry.artifact_path.exists()
             # let's not try to catch this - since this apparently already worked *at least once* - no fallback
-            return zipimport.zipimporter(entry.artifact_path).load_module(module_name)
+            return zipimport.zipimporter(entry.artifact_path).load_module(mod_name)
         # else: we have an installed package, let's try to import it
         original_cwd = Path.cwd()
         assert entry.installation_path.exists()
@@ -473,7 +472,7 @@ def _auto_install(
         # with an installed package there may be weird issues we can't be sure about so let's be safe
         try:
             return _load_venv_entry(
-                module_name=module_name,
+                mod_name=mod_name,
                 installation_path=entry.installation_path,
             )
         except BaseException as err:
@@ -485,7 +484,7 @@ def _auto_install(
 
     # else: we have to download the package and install it
 
-    releases = _get_releases_from_pypi(package_name=package_name, version=version)
+    releases = _get_releases_from_pypi(pkg_name=pkg_name, req_ver=req_ver)
     if isinstance(releases, Exception):
         return releases
     # we *did* ask the user to give us hashes of artifacts that *should* work, so let's check for those.
@@ -511,15 +510,15 @@ def _auto_install(
         try:
             log.info("Attempting to install..")
             entry = _install(
-                package_name=package_name,
+                pkg_name=pkg_name,
                 artifact_path=artifact_path,
-                version=version,
+                requested_version=req_ver,
                 force_install=True,
             )
             # packages like tensorflow-gpu only need to be installed but nothing imported, so module name is empty
             log.info("Attempting to import...")
             mod = _load_venv_entry(
-                module_name=module_name,
+                mod_name=mod_name,
                 installation_path=entry.installation_path,
             )
             log.info("Successfully imported.")
@@ -533,8 +532,8 @@ def _auto_install(
             continue
 
         _save_package_info(
-            package_name=package_name,
-            version=version,
+            pkg_name=pkg_name,
+            version=req_ver,
             artifact_path=entry.artifact_path,
             hash_value=int(
                 hash_algo.value(entry.artifact_path.read_bytes()).hexdigest(), 16
@@ -545,7 +544,7 @@ def _auto_install(
         )
         return mod
     log.critical(
-        f"Could not install {package_name!r} {version!r}. Hashes that were attempted: {[num_as_hexdigest(H) for H in user_provided_hashes]}"
+        f"Could not install {pkg_name!r} {req_ver!r}. Hashes that were attempted: {[num_as_hexdigest(H) for H in user_provided_hashes]}"
     )
     return ImportError(msg)
 
@@ -559,16 +558,16 @@ def _save_package_info(
     installation_path: Path,
     hash_value=int,
     hash_algo: Hash,
-    package_name: str,
+    pkg_name: str,
 ):
     """Update the registry to contain the pkg's metadata."""
     if not registry.execute(
-        f"SELECT * FROM distributions WHERE name='{package_name}' AND version='{version}'"
+        f"SELECT * FROM distributions WHERE name='{pkg_name}' AND version='{version}'"
     ).fetchone():
         registry.execute(
             f"""
 INSERT INTO distributions (name, version, installation_path, date_of_installation, pure_python_package)
-VALUES ('{package_name}', '{version}', '{installation_path}', {time.time()}, {installation_path is None})
+VALUES ('{pkg_name}', '{version}', '{installation_path}', {time.time()}, {installation_path is None})
 """
         )
         registry.execute(
@@ -629,8 +628,8 @@ def _is_pure_python_package(artifact_path: Path, meta: dict) -> bool:
 
 
 @beartype
-def _find_module_in_venv(package_name: str, version: Version, relp: str) -> Path:
-    env_dir = config.venv / package_name / str(version)
+def _find_module_in_venv(pkg_name: str, version: Version, relp: str) -> Path:
+    env_dir = config.venv / pkg_name / str(version)
     log.debug("env_dir=%s", env_dir)
     site_dirs = [
         env_dir / f"Lib{suffix}" / "site-packages"
@@ -652,7 +651,7 @@ def _find_module_in_venv(package_name: str, version: Version, relp: str) -> Path
         sys.path_importer_cache.clear()
         importlib.invalidate_caches()
         # sic! importlib uses sys.path for lookup
-        dist = Distribution.from_name(package_name)
+        dist = Distribution.from_name(pkg_name)
         log.info("dist=%s", dist)
         log.debug("dist.files=%s", dist.files)
         for path in dist.files:
@@ -674,8 +673,8 @@ def _find_module_in_venv(package_name: str, version: Version, relp: str) -> Path
 @beartype
 def _install(
     *,
-    package_name: str,
-    version: Version = None,
+    pkg_name: str,
+    requested_version: Version = None,
     force_install=False,
     artifact_path: Path,
 ) -> RegistryEntry:
@@ -685,7 +684,7 @@ def _install(
     if "__init__.py" in import_parts:
         import_parts.remove("__init__.py")
     relp: str = meta["import_relpath"]
-    venv_root = config.venv / package_name / str(version)
+    venv_root = config.venv / pkg_name / str(requested_version)
     site_pkgs_dir = list(venv_root.rglob("site-packages"))
     if not any(site_pkgs_dir):
         force_install = True
@@ -758,7 +757,7 @@ def _install(
         log.info("Installation successful.")
 
     installation_path = _find_module_in_venv(
-        package_name=package_name, version=version, relp=relp
+        pkg_name=pkg_name, version=requested_version, relp=relp
     )
 
     return RegistryEntry(
@@ -769,8 +768,8 @@ def _install(
 
 
 @beartype
-def _load_venv_entry(*, module_name: str, installation_path: Path) -> ModuleType:
-    if not module_name:
+def _load_venv_entry(*, mod_name: str, installation_path: Path) -> ModuleType:
+    if not mod_name:
         log.info("Module name is empty, returning empty Module.")
         return ModuleType("")
     origcwd = Path.cwd()
@@ -781,7 +780,7 @@ def _load_venv_entry(*, module_name: str, installation_path: Path) -> ModuleType
     try:
         os.chdir(installation_path)
         # importlib and sys.path.. bleh
-        return importlib.import_module(module_name)
+        return importlib.import_module(mod_name)
     except BaseException as err:
         msg = err
         log.error(msg)
@@ -793,12 +792,12 @@ def _load_venv_entry(*, module_name: str, installation_path: Path) -> ModuleType
 
 
 @beartype
-def _get_project_from_pypi(*, package_name: str) -> PyPI_Project | Exception:
+def _get_project_from_pypi(*, pkg_name: str) -> PyPI_Project | Exception:
     # let's check if package name is correct
-    url = f"https://pypi.org/pypi/{package_name}/json"
+    url = f"https://pypi.org/pypi/{pkg_name}/json"
     response = requests.get(url)
     if response.status_code == 404:
-        return ImportError(UserMessage.pebkac_unsupported(package_name))
+        return ImportError(UserMessage.pebkac_unsupported(pkg_name))
     elif response.status_code != 200:
         return RuntimeWarning(UserMessage.web_error(url, response))
     return PyPI_Project(**response.json())
@@ -806,23 +805,22 @@ def _get_project_from_pypi(*, package_name: str) -> PyPI_Project | Exception:
 
 @beartype
 def _get_releases_from_pypi(
-    *, package_name: str, version: Version
+    *, pkg_name: str, req_ver: Version
 ) -> list[PyPI_Release] | Exception:
     # let's check if package name is correct
-    url = f"https://pypi.org/pypi/{package_name}"
-    response = requests.get(url)
+    response = requests.get(url := f"https://pypi.org/pypi/{pkg_name}")
     if response.status_code == 404:
-        return ImportError(UserMessage.pebkac_unsupported(package_name))
+        return ImportError(UserMessage.pebkac_unsupported(pkg_name))
     elif response.status_code != 200:
         return RuntimeWarning(UserMessage.web_error(url, response))
     # let's check if the version is a thing
-    url = f"https://pypi.org/pypi/{package_name}/{version}/json"
-    response = requests.get(url)
+    response = requests.get(url := f"https://pypi.org/pypi/{pkg_name}/{req_ver}/json")
     if response.status_code == 404:
-        return RuntimeWarning(UserMessage.bad_version_given(package_name, version))
+        return RuntimeWarning(UserMessage.bad_version_given(pkg_name, req_ver))
     # looks good, let's get the releases for this version
     urls = response.json()["urls"]
-    return [PyPI_Release(**url, version=version) for url in urls]
+    releases = [PyPI_Release(**url, version=req_ver) for url in urls]
+    return releases
 
 
 @beartype
@@ -929,11 +927,9 @@ def _is_platform_compatible(
 
 
 @beartype
-def _get_version(
-    name: str | None = None, package_name=None, /, mod=None
-) -> Version | None:
+def _get_version(name: str | None = None, pkg_name=None, /, mod=None) -> Version | None:
     version: Callable[...] | Version | str | None = None
-    for lookup_name in (name, package_name):
+    for lookup_name in (name, pkg_name):
         if not lookup_name:
             continue
         try:
@@ -955,22 +951,22 @@ def _get_version(
 
 def _build_mod(
     *,
-    module_name,
+    mod_name,
     code: bytes,
     initial_globals: dict[str, Any] | None,
     module_path,
-    package_name="",
+    pkg_name="",
 ) -> ModuleType:
-    mod = ModuleType(module_name)
-    log.info(f"{Path.cwd()=} {package_name=} {module_name=} {module_path=}")
+    mod = ModuleType(mod_name)
+    log.info(f"{Path.cwd()=} {pkg_name=} {mod_name=} {module_path=}")
     mod.__dict__.update(initial_globals or {})
     mod.__file__ = str(module_path)
     mod.__path__ = [str(module_path.parent)]
-    mod.__package__ = package_name
-    mod.__name__ = module_name
-    loader = SourceFileLoader(module_name, str(module_path))
+    mod.__package__ = pkg_name
+    mod.__name__ = mod_name
+    loader = SourceFileLoader(mod_name, str(module_path))
     mod.__loader__ = loader
-    mod.__spec__ = ModuleSpec(module_name, loader)
+    mod.__spec__ = ModuleSpec(mod_name, loader)
     code_text = codecs.decode(code)
     # module file "<", ">" chars are specially handled by inspect
     getattr(linecache, "cache")[module_path] = (
@@ -1066,10 +1062,10 @@ def _real_path(
     name_as_path = name_as_path_with_ext[: -len(ext) - (1 if ext else 0)]
     name = name_as_path.replace("/", ".")
     name_parts = name.split(".")
-    package_name = ".".join(name_parts[:-1])
-    module_name = path.stem  # sic!
+    pkg_name = ".".join(name_parts[:-1])
+    mod_name = path.stem  # sic!
 
-    return name, module_name, package_name, path
+    return name, mod_name, pkg_name, path
 
 
 numerics = [bool, Integral, Rational, Real, Complex]
@@ -1237,12 +1233,12 @@ def run_in_notebook(code):
     display(Javascript(f"IPython.notebook.kernel.execute('{code}')"))
 
 
-def module_from_pyc(module_name: str, path: Path, initial_globals: dict):
+def module_from_pyc(mod_name: str, path: Path, initial_globals: dict):
     """Create a module from a pyc file.
 
     Parameters
     ----------
-    module_name : str
+    mod_name : str
         The name of the module.
     path : Path
         The path to the pyc file.
@@ -1256,8 +1252,8 @@ def module_from_pyc(module_name: str, path: Path, initial_globals: dict):
 
     """
     initial_globals = initial_globals or {}
-    log.info(f"{Path.cwd()=} {module_name=} {path=}")
-    spec = importlib.util.spec_from_file_location(module_name, path)
+    log.info(f"{Path.cwd()=} {mod_name=} {path=}")
+    spec = importlib.util.spec_from_file_location(mod_name, path)
     mod = importlib.util.module_from_spec(spec)
     mod.__dict__.update(initial_globals)
     spec.loader.exec_module(mod)

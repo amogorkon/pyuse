@@ -168,12 +168,12 @@ class ProxyModule(ModuleType):
 
 
 class ModuleReloader:
-    def __init__(self, *, proxy, name, path, package_name, initial_globals):
+    def __init__(self, *, proxy, name, path, pkg_name, initial_globals):
         self.proxy = proxy
         "ProxyModula that we refer to."
         self.name = name
         self.path = path
-        self.package_name = package_name
+        self.pkg_name = pkg_name
         self.initial_globals = initial_globals
         self._condition = threading.RLock()
         self._stopped = True
@@ -201,7 +201,7 @@ class ModuleReloader:
             if current_filehash != last_filehash:
                 try:
                     mod = _build_mod(
-                        module_name=self.name,
+                        mod_name=self.name,
                         code=code,
                         initial_globals=self.initial_globals,
                         module_path=self.path.resolve(),
@@ -224,7 +224,7 @@ class ModuleReloader:
                 if current_filehash != last_filehash:
                     try:
                         mod = _build_mod(
-                            module_name=self.name,
+                            mod_name=self.name,
                             code=code,
                             initial_globals=self.initial_globals,
                             module_path=self.path,
@@ -552,7 +552,7 @@ VALUES (?, ?)
 
         try:
             mod = _build_mod(
-                module_name=import_as or name,
+                mod_name=import_as or name,
                 code=content,
                 module_path=module_path,
                 initial_globals=initial_globals,
@@ -616,7 +616,7 @@ VALUES (?, ?)
             )
 
         try:
-            name, module_name, package_name, path = _real_path(
+            name, mod_name, pkg_name, path = _real_path(
                 path=path,
                 _applied_decorators=_applied_decorators,
                 landmark=Use.__call__.__code__,
@@ -629,11 +629,11 @@ VALUES (?, ?)
             code = rfile.read()
         try:
             mod = _build_mod(
-                module_name=module_name,
+                mod_name=mod_name,
                 code=code,
                 initial_globals=initial_globals,
                 module_path=path,
-                package_name=package_name,
+                pkg_name=pkg_name,
             )
         except KeyError:
             exc = traceback.format_exc()
@@ -647,7 +647,7 @@ VALUES (?, ?)
                 name=name,
                 path=path,
                 initial_globals=initial_globals,
-                package_name=package_name,
+                pkg_name=pkg_name,
             )
             _reloaders[mod] = reloader
 
@@ -688,8 +688,8 @@ VALUES (?, ?)
         thing: None,  # sic! otherwise single-dispatch with 'empty' *args won't work
         /,
         *,
-        package_name: str = None,
-        module_name: str = None,
+        pkg_name: str = None,
+        mod_name: str = None,
         version: Version | str | None = None,
         hash_algo=Hash.sha256,
         hashes: str | list[str] | None = None,
@@ -716,11 +716,11 @@ VALUES (?, ?)
         Returns:
             ProxyModule|Any: Module if successful, default as specified otherwise.
         """
-        log.debug(f"use-kwargs: {package_name} {module_name} {version} {hashes}")
+        log.debug(f"use-kwargs: {pkg_name} {mod_name} {version} {hashes}")
         return self._use_package(
-            name=f"{package_name}/{module_name}",
-            package_name=package_name,
-            module_name=module_name,
+            name=f"{pkg_name}/{mod_name}",
+            pkg_name=pkg_name,
+            mod_name=mod_name,
             version=Version(version) if version else None,
             hash_algo=hash_algo,
             hashes=hashes,
@@ -763,11 +763,11 @@ VALUES (?, ?)
             ProxyModule|Any: Module if successful, default as specified otherwise.
         """
         log.debug(f"use-tuple: {pkg_tuple} {version} {hashes}")
-        package_name, module_name = pkg_tuple
+        pkg_name, mod_name = pkg_tuple
         return self._use_package(
-            name=f"{package_name}/{module_name}",
-            package_name=package_name,
-            module_name=module_name,
+            name=f"{pkg_name}/{mod_name}",
+            pkg_name=pkg_name,
+            mod_name=mod_name,
             version=Version(version) if version else None,
             hash_algo=hash_algo,
             hashes=hashes,
@@ -810,12 +810,12 @@ VALUES (?, ?)
         Returns:
             ProxyModule|Any: Module (wrapped in a ProxyModule) if successful, default as specified if the requested Module couldn't be imported for some reason.
         """
-        package_name, module_name = _parse_name(name)
+        pkg_name, mod_name = _parse_name(name)
         return self._use_package(
             name=name,
-            package_name=package_name,
-            module_name=module_name,
-            version=Version(version) if version else None,
+            pkg_name=pkg_name,
+            mod_name=mod_name,
+            req_ver=Version(version) if version else None,
             hash_algo=hash_algo,
             hashes=hashes,
             default=default,
@@ -829,10 +829,10 @@ VALUES (?, ?)
         self,
         *,
         name,
-        package_name: str,
-        module_name: str,
-        version: Version | None,
-        hashes: str | set | None,
+        pkg_name: str,
+        mod_name: str,
+        req_ver: Version | None,
+        hashes: str | set[str] | None,
         default: Any,
         hash_algo: Hash,
         modes: int = 0,
@@ -845,9 +845,10 @@ VALUES (?, ?)
         fatal_exceptions = bool(Modes.fatal_exceptions & modes)
         no_browser = bool(Modes.no_browser & modes)
         cleanup = not bool(Modes.no_cleanup & modes)
+        hashes: set[int] = _hashes(hashes)
 
-        if module_name:
-            module_name = module_name.replace("/", ".").replace("-", "_")
+        if mod_name:
+            mod_name = mod_name.replace("/", ".").replace("-", "_")
 
         # a single hash is a string
         if isinstance(hashes, str):
@@ -873,14 +874,14 @@ VALUES (?, ?)
             auto_install,
         )
         log.info(
-            f"{name=}, {package_name=}, {module_name=}, {hashes=}, {version=}, {installed_version=}, {auto_install=}, {case=}"
+            f"{name=}, {pkg_name=}, {mod_name=}, {hashes=}, {req_ver=}, {installed_version=}, {auto_install=}, {case=}"
         )
         # welcome to the buffet table, where everything is a lie
         kwargs = {
             "name": name,
-            "package_name": package_name,
-            "module_name": module_name,
-            "version": version,
+            "pkg_name": pkg_name,
+            "mod_name": mod_name,
+            "req_ver": req_ver,
             "user_provided_hashes": hashes,
             "hash_algo": hash_algo,
             "fastfail": fastfail,
@@ -903,9 +904,9 @@ VALUES (?, ?)
 
         if isinstance(result, ModuleType):
             if import_as:
-                M = sys.modules[module_name]
+                M = sys.modules[mod_name]
                 sys.modules[import_as] = M
-                del sys.modules[module_name]
+                del sys.modules[mod_name]
 
             return ProxyModule(result)
 
